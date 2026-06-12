@@ -17,8 +17,10 @@ const PREFS_KEY = 'swipe_prefs_v2'
 const THEME_KEY = 'swipe_theme'
 
 function loadPrefs(): OnboardingPrefs | null {
-  try { return JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null') }
-  catch { return null }
+  try {
+    const raw = localStorage.getItem(PREFS_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
 }
 
 function applyTheme(theme: 'light' | 'dark') {
@@ -44,20 +46,28 @@ function applyTheme(theme: 'light' | 'dark') {
 }
 
 export default function App() {
-  const { initData, isDark: tgDark } = useTelegram()
-  const [prefs, setPrefs] = useState<OnboardingPrefs | null>(loadPrefs)
-  const [theme, setTheme] = useState<'light' | 'dark'>(
-    () => (localStorage.getItem(THEME_KEY) as any) ?? (tgDark ? 'dark' : 'light')
-  )
+  const { initData, isDark } = useTelegram()
+  const [prefs, setPrefs] = useState<OnboardingPrefs | null>(null)
+  const [prefsLoaded, setPrefsLoaded] = useState(false)
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [showSettings, setShowSettings] = useState(false)
+
+  // Загружаем prefs после монтирования
+  useEffect(() => {
+    const saved = loadPrefs()
+    setPrefs(saved)
+    setPrefsLoaded(true)
+    const savedTheme = (localStorage.getItem(THEME_KEY) as 'light' | 'dark') ?? (isDark ? 'dark' : 'light')
+    setTheme(savedTheme)
+  }, [])
 
   useEffect(() => { setInitData(initData) }, [initData])
   useEffect(() => { applyTheme(theme) }, [theme])
 
-  const handleThemeChange = (t: 'light' | 'dark') => {
-    setTheme(t)
-    // НЕ закрываем настройки при смене темы
-  }
+  const handleThemeChange = (t: 'light' | 'dark') => setTheme(t)
+
+  // Пока не загрузили prefs — показываем пустой экран
+  if (!prefsLoaded) return <div className="app" />
 
   if (!prefs) {
     return (
@@ -86,7 +96,6 @@ export default function App() {
           </Routes>
         </main>
 
-        {/* 4 вкладки — Скидки вместо заглушки батлов */}
         <nav className="bottom-nav">
           <NavLink to="/" end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <span className="nav-icon">🔥</span>
@@ -106,7 +115,6 @@ export default function App() {
           </NavLink>
         </nav>
 
-        {/* Настройки — bottom sheet, НЕ закрывается при смене темы */}
         {showSettings && (
           <div className="modal-overlay" onClick={() => setShowSettings(false)}>
             <div className="modal-sheet" onClick={e => e.stopPropagation()}>

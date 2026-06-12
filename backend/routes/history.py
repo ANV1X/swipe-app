@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from db.session import get_db
 from db.models import Swipe, Product
-from auth import get_current_user_dev as get_current_user
+from auth import get_current_user
 from pydantic import BaseModel
 from datetime import datetime
 

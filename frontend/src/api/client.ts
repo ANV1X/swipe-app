@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:8000'
+const BASE_URL = 'https://honest-reflection-production-3f73.up.railway.app'
 let _initData = ''
 export function setInitData(d: string) { _initData = d }
 function headers(): HeadersInit {
@@ -56,14 +56,14 @@ export async function fetchProducts(p?: { category?: string; price_max?: number;
   if (p?.category) q.set('category', p.category)
   if (p?.price_max) q.set('price_max', String(p.price_max))
   if (p?.gender) q.set('gender', p.gender)
-  const res = await fetch(`${BASE_URL}/products?${q}`, { headers: headers() })
+  const res = await fetch(`${BASE_URL}/products/?${q}`, { headers: headers() })
   if (!res.ok) throw new Error('products failed')
   return res.json()
 }
 
 // ─── Swipes ────────────────────────────────────────────────────────────
 export async function postSwipe(product_id: string, direction: 'left' | 'right') {
-  const res = await fetch(`${BASE_URL}/swipe`, {
+  const res = await fetch(`${BASE_URL}/swipe/`, {
     method: 'POST', headers: headers(),
     body: JSON.stringify({ product_id, direction }),
   })
@@ -73,7 +73,7 @@ export async function postSwipe(product_id: string, direction: 'left' | 'right')
 
 // ─── Wishlist ──────────────────────────────────────────────────────────
 export async function fetchWishlist(): Promise<WishlistItem[]> {
-  const res = await fetch(`${BASE_URL}/wishlist`, { headers: headers() })
+  const res = await fetch(`${BASE_URL}/wishlist/`, { headers: headers() })
   if (!res.ok) throw new Error('wishlist failed')
   return res.json()
 }
@@ -85,12 +85,12 @@ export async function removeFromWishlist(product_id: string) {
 
 // ─── Shared Wishlist ───────────────────────────────────────────────────
 export async function fetchSharedWishlists(): Promise<SharedWishlistData[]> {
-  const res = await fetch(`${BASE_URL}/shared-wishlist`, { headers: headers() })
+  const res = await fetch(`${BASE_URL}/shared-wishlist/`, { headers: headers() })
   if (!res.ok) throw new Error('shared failed')
   return res.json()
 }
 export async function createSharedWishlist(name: string): Promise<SharedWishlistData> {
-  const res = await fetch(`${BASE_URL}/shared-wishlist`, {
+  const res = await fetch(`${BASE_URL}/shared-wishlist/`, {
     method: 'POST', headers: headers(), body: JSON.stringify({ name }),
   })
   if (!res.ok) throw new Error('create failed')
@@ -114,7 +114,7 @@ export async function removeFromSharedWishlist(id: string, product_id: string) {
 
 // ─── Profile ───────────────────────────────────────────────────────────
 export async function fetchProfile(): Promise<ProfileData> {
-  const res = await fetch(`${BASE_URL}/profile`, { headers: headers() })
+  const res = await fetch(`${BASE_URL}/profile/`, { headers: headers() })
   if (!res.ok) throw new Error('profile failed')
   return res.json()
 }
@@ -124,7 +124,7 @@ export async function fetchDeals(p?: { for_you?: boolean; category?: string }): 
   const q = new URLSearchParams()
   if (p?.for_you) q.set('for_you', 'true')
   if (p?.category) q.set('category', p.category)
-  const res = await fetch(`${BASE_URL}/deals?${q}`, { headers: headers() })
+  const res = await fetch(`${BASE_URL}/deals/?${q}`, { headers: headers() })
   if (!res.ok) throw new Error('deals failed')
   return res.json()
 }
@@ -136,7 +136,7 @@ export async function addToWishlistById(product_id: string) {
 export async function fetchHistory(direction?: string): Promise<SwipeHistoryItem[]> {
   const q = new URLSearchParams()
   if (direction) q.set('direction', direction)
-  const res = await fetch(`${BASE_URL}/history?${q}`, { headers: headers() })
+  const res = await fetch(`${BASE_URL}/history/?${q}`, { headers: headers() })
   if (!res.ok) throw new Error('history failed')
   return res.json()
 }

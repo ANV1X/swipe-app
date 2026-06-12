@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 
 declare global {
   interface Window {
-    Telegram: {
+    Telegram?: {
       WebApp: {
         initData: string
         initDataUnsafe: {
@@ -11,22 +11,17 @@ declare global {
             first_name: string
             last_name?: string
             username?: string
-            photo_url?: string
           }
         }
         colorScheme: 'light' | 'dark'
-        themeParams: Record<string, string>
+        HapticFeedback: {
+          impactOccurred(style: 'light' | 'medium' | 'heavy'): void
+        }
         MainButton: {
-          text: string
+          setText(text: string): void
           show(): void
           hide(): void
           onClick(cb: () => void): void
-          offClick(cb: () => void): void
-          setText(text: string): void
-        }
-        HapticFeedback: {
-          impactOccurred(style: 'light' | 'medium' | 'heavy'): void
-          notificationOccurred(type: 'error' | 'success' | 'warning'): void
         }
         expand(): void
         close(): void
@@ -42,16 +37,21 @@ export function useTelegram() {
   useEffect(() => {
     if (tg) {
       tg.ready()
-      tg.expand()   // разворачиваем на весь экран
+      tg.expand()
     }
   }, [])
 
-  const user = tg?.initDataUnsafe?.user
+  const user = tg?.initDataUnsafe?.user ?? {
+    id: 123456789,
+    first_name: 'Dev',
+    username: 'devuser',
+  }
+
   const initData = tg?.initData ?? ''
   const isDark = tg?.colorScheme === 'dark'
 
   const haptic = (style: 'light' | 'medium' | 'heavy' = 'light') => {
-    tg?.HapticFeedback?.impactOccurred(style)
+    try { tg?.HapticFeedback?.impactOccurred(style) } catch {}
   }
 
   return { tg, user, initData, isDark, haptic }

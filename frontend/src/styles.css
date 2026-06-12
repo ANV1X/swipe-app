@@ -1499,3 +1499,52 @@ html, body, #root {
   font-weight: 700;
   display: flex; align-items: center; justify-content: center;
 }
+
+/* ─── SwipeStack ──────────────────────────────────────────── */
+.swipe-stack-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.swipe-stack-top,
+.swipe-stack-bg {
+  position: absolute;
+  width: calc(100% - 32px);
+  max-width: 400px;
+}
+
+.swipe-stack-bg {
+  transform-origin: center bottom;
+}
+
+.swipe-indicator {
+  position: absolute;
+  top: 24px;
+  z-index: 20;
+  font-size: 22px;
+  font-weight: 800;
+  padding: 8px 18px;
+  border-radius: 12px;
+  pointer-events: none;
+  letter-spacing: 1px;
+}
+
+.swipe-indicator--like {
+  left: 20px;
+  background: #E8F8F2;
+  color: #00A878;
+  border: 2px solid #00A878;
+  transform: rotate(-15deg);
+}
+
+.swipe-indicator--nope {
+  right: 20px;
+  background: #FFF0F5;
+  color: #FF4757;
+  border: 2px solid #FF4757;
+  transform: rotate(15deg);
+}
