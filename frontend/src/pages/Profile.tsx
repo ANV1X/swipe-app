@@ -22,7 +22,6 @@ export default function Profile({ onSettingsOpen }: Props) {
 
   const likeRate = profile.total_swipes > 0
     ? Math.round((profile.likes / profile.total_swipes) * 100) : 0
-
   const unlockedCount = profile.achievements.filter(a => a.unlocked).length
 
   return (
@@ -107,6 +106,11 @@ export default function Profile({ onSettingsOpen }: Props) {
           <div className="profile-menu-item" onClick={() => navigate('/shared')}>
             <span className="profile-menu-icon">👥</span>
             <span className="profile-menu-label">Совместные вишлисты</span>
+            <span className="profile-menu-arrow">›</span>
+          </div>
+          <div className="profile-menu-item" onClick={() => navigate('/deals')}>
+            <span className="profile-menu-icon">🏷️</span>
+            <span className="profile-menu-label">Горячие скидки</span>
             <span className="profile-menu-arrow">›</span>
           </div>
           <div className="profile-menu-item" onClick={onSettingsOpen}>

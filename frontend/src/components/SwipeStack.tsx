@@ -30,7 +30,7 @@ export default function SwipeStack({ items, onSwipe, renderItem }: SwipeStackPro
   const handleEnd = useCallback(() => {
     if (!dragging) return
     setDragging(false)
-    const threshold = 80
+    const threshold = 100 // Чуть увеличили порог для исключения случайных микродвижений
     if (offset.x > threshold) {
       onSwipe('right', topItem)
     } else if (offset.x < -threshold) {
@@ -49,35 +49,62 @@ export default function SwipeStack({ items, onSwipe, renderItem }: SwipeStackPro
   const onTouchMove = (e: React.TouchEvent) => handleMove(e.touches[0].clientX, e.touches[0].clientY)
   const onTouchEnd = () => handleEnd()
 
-  const rotate = offset.x * 0.08
-  const opacity = Math.max(0, 1 - Math.abs(offset.x) / 300)
-
-  // Показываем направление свайпа
-  const showLike = offset.x > 30
-  const showNope = offset.x < -30
+  const rotate = offset.x * 0.06 // Мягкий наклон карточки при переносе
+  
+  // Вычисляем интенсивность свайпа для индикаторов
+  const showLike = offset.x > 20
+  const showNope = offset.x < -20
 
   return (
-    <div className="swipe-stack-container">
-      {/* Фоновые карточки */}
-      {items.slice(-3, -1).reverse().map((item, i) => (
-        <div
-          key={item.id}
-          className="swipe-stack-bg"
-          style={{ transform: `scale(${0.94 + i * 0.03}) translateY(${(1 - i) * 10}px)`, zIndex: i }}
-        >
-          {renderItem(item)}
-        </div>
-      ))}
+    <div className="swipe-stack-container" style={{ 
+      position: 'relative', 
+      width: '100%', 
+      maxWidth: '360px', 
+      height: '480px', // Идеальная пропорция под экран смартфона
+      margin: '0 auto' 
+    }}>
+      {/* Фоновые карточки (создают эффект колоды) */}
+      {items.slice(-3, -1).reverse().map((item, i) => {
+        // Вычисляем красивое смещение: чем глубже карта, тем она меньше
+        const scale = 0.95 + (i * 0.025)
+        const translateY = (1 - i) * 12
+        return (
+          <div
+            key={item.id}
+            className="swipe-stack-bg"
+            style={{ 
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              top: 0,
+              left: 0,
+              transform: `scale(${scale}) translateY(${translateY}px)`, 
+              zIndex: i,
+              opacity: 0.85 + (i * 0.1),
+              transition: dragging ? 'none' : 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+              pointerEvents: 'none'
+            }}
+          >
+            {renderItem(item)}
+          </div>
+        )
+      })}
 
-      {/* Верхняя карточка */}
+      {/* Верхняя интерактивная карточка */}
       {topItem && (
         <div
           ref={cardRef}
           className="swipe-stack-top"
           style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            top: 0,
+            left: 0,
             transform: `translateX(${offset.x}px) translateY(${offset.y * 0.2}px) rotate(${rotate}deg)`,
-            transition: dragging ? 'none' : 'transform 0.3s ease',
+            transition: dragging ? 'none' : 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
             zIndex: 10,
+            touchAction: 'none',
             cursor: dragging ? 'grabbing' : 'grab',
           }}
           onMouseDown={onMouseDown}
@@ -88,15 +115,47 @@ export default function SwipeStack({ items, onSwipe, renderItem }: SwipeStackPro
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
         >
-          {/* Like / Nope индикаторы */}
+          {/* Минималистичные штампы по углам во время драга */}
           {showLike && (
-            <div className="swipe-indicator swipe-indicator--like" style={{ opacity: Math.min(1, offset.x / 100) }}>
-              LIKE ❤️
+            <div className="swipe-indicator swipe-indicator--like" style={{ 
+              opacity: Math.min(1, offset.x / 80),
+              position: 'absolute',
+              top: '28px',
+              left: '20px',
+              zIndex: 20,
+              border: '3px solid #34C759',
+              color: '#34C759',
+              fontSize: '20px',
+              fontWeight: 800,
+              borderRadius: '8px',
+              padding: '4px 12px',
+              transform: 'rotate(-12deg)',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              backgroundColor: 'rgba(255,255,255,0.1)'
+            }}>
+              В ХОТЕЛКИ
             </div>
           )}
           {showNope && (
-            <div className="swipe-indicator swipe-indicator--nope" style={{ opacity: Math.min(1, -offset.x / 100) }}>
-              NOPE ✕
+            <div className="swipe-indicator swipe-indicator--nope" style={{ 
+              opacity: Math.min(1, -offset.x / 80),
+              position: 'absolute',
+              top: '28px',
+              right: '20px',
+              zIndex: 20,
+              border: '3px solid #FF3B30',
+              color: '#FF3B30',
+              fontSize: '20px',
+              fontWeight: 800,
+              borderRadius: '8px',
+              padding: '4px 12px',
+              transform: 'rotate(12deg)',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              backgroundColor: 'rgba(255,255,255,0.1)'
+            }}>
+              ПРОПУСТИТЬ
             </div>
           )}
           {renderItem(topItem)}

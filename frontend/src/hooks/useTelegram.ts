@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 declare global {
   interface Window {
@@ -14,6 +14,8 @@ declare global {
           }
         }
         colorScheme: 'light' | 'dark'
+        platform: string
+        version: string
         HapticFeedback: {
           impactOccurred(style: 'light' | 'medium' | 'heavy'): void
         }
@@ -32,27 +34,47 @@ declare global {
 }
 
 export function useTelegram() {
-  const tg = window.Telegram?.WebApp
+  const [tgData, setTgData] = useState<{
+    initData: string
+    user: { id: number; first_name: string; username?: string }
+    isDark: boolean
+  }>({
+    initData: '',
+    user: { id: 0, first_name: 'User' },
+    isDark: false,
+  })
 
   useEffect(() => {
-    if (tg) {
-      tg.ready()
-      tg.expand()
+    const init = () => {
+      const tg = window.Telegram?.WebApp
+      if (tg) {
+        tg.ready()
+        tg.expand()
+        setTgData({
+          initData: tg.initData || '',
+          user: tg.initDataUnsafe?.user ?? { id: 0, first_name: 'User' },
+          isDark: tg.colorScheme === 'dark',
+        })
+        console.log('TG OK, initData length:', tg.initData?.length)
+      } else {
+        console.log('No Telegram.WebApp after timeout')
+      }
     }
+
+    // Даём 500ms на загрузку telegram-web-app.js
+    const timer = setTimeout(init, 500)
+    return () => clearTimeout(timer)
   }, [])
 
-  const user = tg?.initDataUnsafe?.user ?? {
-    id: 123456789,
-    first_name: 'Dev',
-    username: 'devuser',
-  }
-
-  const initData = tg?.initData ?? ''
-  const isDark = tg?.colorScheme === 'dark'
-
   const haptic = (style: 'light' | 'medium' | 'heavy' = 'light') => {
-    try { tg?.HapticFeedback?.impactOccurred(style) } catch {}
+    try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(style) } catch {}
   }
 
-  return { tg, user, initData, isDark, haptic }
+  return {
+    tg: window.Telegram?.WebApp,
+    user: tgData.user,
+    initData: tgData.initData,
+    isDark: tgData.isDark,
+    haptic,
+  }
 }

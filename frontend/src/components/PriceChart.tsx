@@ -38,7 +38,6 @@ export default function PriceChart({ product_id, current_price }: Props) {
     }
   }
 
-  // SVG мини-график
   const renderChart = (points: Point[], min: number, max: number) => {
     if (points.length < 2) return null
     const W = 280, H = 64, pad = 8
@@ -49,47 +48,50 @@ export default function PriceChart({ product_id, current_price }: Props) {
     const path = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x},${ys[i]}`).join(' ')
     const area = `${path} L${xs[xs.length-1]},${H} L${xs[0]},${H} Z`
 
+    // Изменение цвета в зависимости от тренда (v3 Colors)
     const isDown = points[points.length - 1].price <= points[0].price
-    const color = isDown ? '#00B894' : '#E17055'
+    const color = isDown ? 'var(--green)' : 'var(--red)'
 
-    // Текущая цена — последняя точка
     const cx = xs[xs.length - 1]
     const cy = ys[ys.length - 1]
 
     return (
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible' }}>
+      <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
         <defs>
           <linearGradient id={`g_${product_id}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+            <stop offset="0%" stopColor={color} stopOpacity="0.15" />
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
         <path d={area} fill={`url(#g_${product_id})`} />
-        <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={cx} cy={cy} r="4" fill={color} />
+        <path d={path} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={cx} cy={cy} r="4.5" fill={color} stroke="var(--surface)" strokeWidth="1.5" />
       </svg>
-    )
-  }
-
-  if (!open) {
-    return (
-      <button className="price-chart-toggle" onClick={load}>
-        📈 График цены
-      </button>
     )
   }
 
   return (
     <div className="price-chart-wrap">
-      <button className="price-chart-toggle active" onClick={() => setOpen(false)}>
-        📈 График цены ▲
+      {/* Кнопка-переключатель */}
+      <button className={`price-chart-toggle ${open ? 'active' : ''}`} onClick={load}>
+        <span>История цены</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
       </button>
-      {loading && <div className="price-chart-loading"><div className="spinner-sm" /></div>}
-      {data && !loading && (
+      
+      {loading && (
+        <div className="price-chart-loading">
+          <div className="spinner-sm" />
+        </div>
+      )}
+
+      {data && !loading && open && (
         <div className="price-chart-body">
+          {/* Сетка мини-статистики */}
           <div className="price-chart-stats">
             <div className="pcs-item">
-              <span className="pcs-label">Минимум</span>
+              <span className="pcs-label">Мин</span>
               <span className="pcs-value pcs-green">{formatPrice(data.min_price)}</span>
             </div>
             <div className="pcs-item">
@@ -97,23 +99,36 @@ export default function PriceChart({ product_id, current_price }: Props) {
               <span className="pcs-value">{formatPrice(data.current_price)}</span>
             </div>
             <div className="pcs-item">
-              <span className="pcs-label">Максимум</span>
+              <span className="pcs-label">Макс</span>
               <span className="pcs-value pcs-red">{formatPrice(data.max_price)}</span>
             </div>
           </div>
+
+          {/* SVG трек */}
           <div className="price-chart-svg">
             {renderChart(data.points, data.min_price, data.max_price)}
           </div>
+
+          {/* Полезный инсайт для пользователя */}
           {data.min_price < data.current_price && (
-            <p className="price-chart-hint">
-              💡 Минимальная цена была {formatPrice(data.min_price)} — сейчас{' '}
-              {Math.round((data.current_price - data.min_price) / data.min_price * 100)}% выше
-            </p>
+            <div className="price-chart-hint">
+              <span className="price-chart-hint-icon">💡</span>
+              <p style={{ margin: 0 }}>
+                Минимальная цена была <strong>{formatPrice(data.min_price)}</strong> — сейчас на{' '}
+                <span className="pcs-red" style={{ fontWeight: 700 }}>
+                  {Math.round((data.current_price - data.min_price) / data.min_price * 100)}%
+                </span> выше.
+              </p>
+            </div>
           )}
+          
           {data.current_price <= data.min_price && (
-            <p className="price-chart-hint pch-green">
-              ✅ Сейчас минимальная цена за 90 дней — отличный момент купить!
-            </p>
+            <div className="price-chart-hint pch-green">
+              <span className="price-chart-hint-icon">✅</span>
+              <p style={{ margin: 0 }}>
+                Сейчас минимальная цена за 90 дней — отличный момент для покупки!
+              </p>
+            </div>
           )}
         </div>
       )}
