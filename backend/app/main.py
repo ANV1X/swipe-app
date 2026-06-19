@@ -28,7 +28,7 @@ app.include_router(users.router)
 
 @app.on_event("startup")
 async def startup():
-    asyncio.create_task(dp.start_polling())
+    asyncio.create_task(dp.start_polling(bot))  # <-- передаём bot
     scheduler.start()
 
 @app.on_event("shutdown")
