@@ -1,65 +1,39 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from db.session import get_db
-from db.models import Swipe, Wishlist, User, Product
-from auth import get_current_user
-from pydantic import BaseModel
+from app.database import get_db
+from app.models import Swipe, Product, WishlistItem
+from app.schemas import SwipeCreate
+from app.auth import get_current_user
+from app.models import User
 
-router = APIRouter()
-
-
-class SwipeIn(BaseModel):
-    product_id: str
-    direction: str      # "left" | "right"
-
+router = APIRouter(prefix="/swipe", tags=["swipes"])
 
 @router.post("/")
-def post_swipe(
-    body: SwipeIn,
-    user=Depends(get_current_user),
+def swipe_product(
+    swipe_data: SwipeCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    if body.direction not in ("left", "right"):
-        raise HTTPException(status_code=400, detail="direction must be 'left' or 'right'")
-
-    user_id = str(user["id"])
-
-    # Убедимся что пользователь существует в БД
-    db_user = db.get(User, user_id)
-    if not db_user:
-        db_user = User(
-            id=user_id,
-            first_name=user.get("first_name", ""),
-            username=user.get("username"),
-        )
-        db.add(db_user)
-
-    # Проверим что товар существует
-    product = db.get(Product, body.product_id)
+    product = db.query(Product).filter(Product.id == swipe_data.product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-
-    try:
-        swipe = Swipe(
-            user_id=user_id,
-            product_id=body.product_id,
-            direction=body.direction,
+    existing = db.query(Swipe).filter(
+        Swipe.user_id == current_user.id,
+        Swipe.product_id == swipe_data.product_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Already swiped this product")
+    swipe = Swipe(
+        user_id=current_user.id,
+        product_id=swipe_data.product_id,
+        direction=swipe_data.direction
+    )
+    db.add(swipe)
+    if swipe_data.direction == "right":
+        wishlist_item = WishlistItem(
+            user_id=current_user.id,
+            product_id=swipe_data.product_id
         )
-        db.add(swipe)
-
-        # Лайк — добавляем в вишлист
-        if body.direction == "right":
-            wishlist_item = Wishlist(
-                user_id=user_id,
-                product_id=body.product_id,
-            )
-            db.add(wishlist_item)
-
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        # Уже свайпнут — просто игнорируем
-        pass
-
-    return {"ok": True}
+        db.add(wishlist_item)
+    db.commit()
+    return {"status": "ok", "direction": swipe_data.direction}

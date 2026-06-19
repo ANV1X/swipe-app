@@ -94,7 +94,7 @@ def vote(
     return {"status": "voted"}
 
 @router.post("/{battle_id}/end")
-def end_battle(
+async def end_battle(  # <-- сделали асинхронной
     battle_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -123,6 +123,7 @@ def end_battle(
         )
         db.add(notification)
         db.commit()
+        # Теперь await работает, т.к. функция асинхронная
         await send_notification(winner.telegram_id, notification.message)
     db.commit()
     return {"status": "battle ended", "winner_id": winner_entry.user_id if winner_entry else None}

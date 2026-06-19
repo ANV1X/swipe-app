@@ -1,81 +1,42 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import select
-from db.session import get_db
-from db.models import Product, Swipe, PriceHistory
-from auth import get_current_user
-from pydantic import BaseModel
-from datetime import datetime
+from typing import Optional, List
+from app.database import get_db
+from app.models import Product
+from app.schemas import Product as ProductSchema
+from app.auth import get_current_user
+from app.models import User
 
-router = APIRouter()
+router = APIRouter(prefix="/products", tags=["products"])
 
-
-class ProductOut(BaseModel):
-    id: str
-    title: str
-    brand: str | None
-    price: int
-    price_old: int | None
-    image_url: str
-    marketplace: str
-    external_url: str
-    category: str
-    gender: str | None
-    model_config = {"from_attributes": True}
-
-
-class PricePointOut(BaseModel):
-    price: int
-    date: datetime
-
-
-@router.get("/", response_model=list[ProductOut])
+@router.get("/", response_model=List[ProductSchema])
 def get_products(
-    category: str | None = Query(None),
-    price_max: int | None = Query(None),
-    gender: str | None = Query(None),
-    limit: int = Query(20, le=50),
-    user=Depends(get_current_user),
+    category: Optional[str] = Query(None),
+    style: Optional[str] = Query(None),
+    min_price: Optional[float] = Query(None),
+    max_price: Optional[float] = Query(None),
+    limit: int = Query(20, le=100),
+    offset: int = Query(0),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    user_id = str(user["id"])
-    swiped_ids = db.scalars(
-        select(Swipe.product_id).where(Swipe.user_id == user_id)
-    ).all()
-
-    q = select(Product).where(Product.id.notin_(swiped_ids))
+    query = db.query(Product)
     if category:
-        q = q.where(Product.category == category)
-    if price_max:
-        q = q.where(Product.price <= price_max * 100)
-    if gender:
-        q = q.where(Product.gender.in_([gender, "unisex"]))
+        query = query.filter(Product.category == category)
+    if style:
+        query = query.filter(Product.style == style)
+    if min_price is not None:
+        query = query.filter(Product.price >= min_price)
+    if max_price is not None:
+        query = query.filter(Product.price <= max_price)
+    swiped_product_ids = [s.product_id for s in current_user.swipes]
+    if swiped_product_ids:
+        query = query.filter(Product.id.notin_(swiped_product_ids))
+    return query.offset(offset).limit(limit).all()
 
-    return db.scalars(q.limit(limit)).all()
-
-
-@router.get("/{product_id}/price-history", response_model=list[PricePointOut])
-def get_price_history(
-    product_id: str,
-    db: Session = Depends(get_db),
-):
-    """График цены за последние 90 дней."""
-    from datetime import timedelta
-    cutoff = datetime.utcnow() - timedelta(days=90)
-
-    history = db.scalars(
-        select(PriceHistory)
-        .where(
-            PriceHistory.product_id == product_id,
-            PriceHistory.created_at >= cutoff
-        )
-        .order_by(PriceHistory.created_at.asc())
-    ).all()
-
-    # Добавляем текущую цену как последнюю точку
-    product = db.get(Product, product_id)
-    result = [PricePointOut(price=h.price, date=h.created_at) for h in history]
-    if product:
-        result.append(PricePointOut(price=product.price, date=datetime.utcnow()))
-
-    return result
+@router.get("/{product_id}", response_model=ProductSchema)
+def get_product(product_id: int, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product

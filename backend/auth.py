@@ -1,61 +1,60 @@
-import hashlib
 import hmac
+import hashlib
 import json
-from urllib.parse import parse_qsl
-from fastapi import Header, HTTPException
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-
+from typing import Optional
+from fastapi import HTTPException, Header, Depends
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models import User
+from app.config import Config
 
 def validate_telegram_init_data(init_data: str) -> dict:
-    if not init_data:
-        print("DEBUG: initData пустой!")
-        raise HTTPException(status_code=401, detail="Empty initData")
-
-    params = dict(parse_qsl(init_data, keep_blank_values=True))
-    received_hash = params.pop("hash", None)
-
-    if not received_hash:
-        print(f"DEBUG: нет hash в initData. Params: {list(params.keys())}")
-        raise HTTPException(status_code=401, detail="Missing hash")
-
-    data_check_string = "\n".join(
-        f"{k}={v}" for k, v in sorted(params.items())
-    )
-
-    secret_key = hmac.new(
-        b"WebAppData",
-        BOT_TOKEN.encode(),
-        hashlib.sha256
-    ).digest()
-
-    expected_hash = hmac.new(
-        secret_key,
-        data_check_string.encode(),
-        hashlib.sha256
-    ).hexdigest()
-
-    if not hmac.compare_digest(expected_hash, received_hash):
-        print(f"DEBUG: hash mismatch")
-        print(f"  BOT_TOKEN (first 10 chars): {BOT_TOKEN[:10]}")
-        print(f"  data_check_string: {data_check_string[:200]}")
-        print(f"  expected: {expected_hash}")
-        print(f"  received: {received_hash}")
-        raise HTTPException(status_code=401, detail="Invalid signature")
-
+    params = {}
+    for part in init_data.split('&'):
+        key, value = part.split('=')
+        params[key] = value
+    if 'hash' not in params:
+        raise HTTPException(status_code=400, detail="No hash in initData")
+    hash_str = params.pop('hash')
+    data_check_string = '\n'.join([f"{k}={v}" for k, v in sorted(params.items())])
+    secret_key = hmac.new(b"WebAppData", Config.BOT_TOKEN.encode(), hashlib.sha256).digest()
+    expected_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if expected_hash != hash_str:
+        raise HTTPException(status_code=400, detail="Invalid initData hash")
     return params
 
-
-def get_current_user(x_init_data: str = Header(..., alias="X-Init-Data")):
+async def get_current_user(
+    x_init_data: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> User:
+    if not x_init_data:
+        raise HTTPException(status_code=401, detail="Missing X-Init-Data header")
     data = validate_telegram_init_data(x_init_data)
-    user = json.loads(data.get("user", "{}"))
+    user_data = json.loads(data.get('user', '{}'))
+    if not user_data:
+        raise HTTPException(status_code=400, detail="User data missing")
+    telegram_id = user_data.get('id')
+    if not telegram_id:
+        raise HTTPException(status_code=400, detail="User id missing")
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
     if not user:
-        raise HTTPException(status_code=401, detail="No user in initData")
+        user = User(
+            telegram_id=telegram_id,
+            username=user_data.get('username'),
+            first_name=user_data.get('first_name', ''),
+            last_name=user_data.get('last_name'),
+            photo_url=user_data.get('photo_url')
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
     return user
 
-
-def get_current_user_dev():
-    return {"id": 123456789, "first_name": "Dev", "username": "devuser"}
+async def get_current_user_dev(db: Session = Depends(get_db)) -> User:
+    user = db.query(User).filter(User.telegram_id == 123456789).first()
+    if not user:
+        user = User(telegram_id=123456789, first_name="Dev", username="devuser")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
