@@ -1,0 +1,863 @@
+=== app/__init__.py ===
+# Пустой файл
+=== app/config.py ===
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class Config:
+    BOT_TOKEN = os.getenv("BOT_TOKEN")
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    SUPABASE_URL = os.getenv("SUPABASE_URL")
+    SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+    SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
+    ALGORITHM = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES = 30
+=== app/database.py ===
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from app.config import Config
+
+engine = create_engine(Config.DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+=== app/models.py ===
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, JSON
+from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
+from app.database import Base
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    telegram_id = Column(Integer, unique=True, index=True)
+    username = Column(String, nullable=True)
+    first_name = Column(String)
+    last_name = Column(String, nullable=True)
+    photo_url = Column(String, nullable=True)
+    is_premium = Column(Boolean, default=False)
+    stars_balance = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    swipes = relationship("Swipe", back_populates="user")
+    wishlist_items = relationship("WishlistItem", back_populates="user")
+    battle_entries = relationship("BattleEntry", back_populates="user")
+    votes = relationship("Vote", back_populates="user")
+    notifications = relationship("Notification", back_populates="user")
+    shared_wishlists = relationship("SharedWishlist", back_populates="user")
+
+class Product(Base):
+    __tablename__ = "products"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    description = Column(Text, nullable=True)
+    price = Column(Float)
+    old_price = Column(Float, nullable=True)
+    currency = Column(String, default="RUB")
+    image_url = Column(String)
+    category = Column(String, index=True)
+    style = Column(String, index=True)
+    brand = Column(String, nullable=True)
+    marketplace_url = Column(String)
+    marketplace = Column(String)
+    is_sponsored = Column(Boolean, default=False)
+    sponsor_brand = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    swipes = relationship("Swipe", back_populates="product")
+    wishlist_items = relationship("WishlistItem", back_populates="product")
+    battle_entries = relationship("BattleEntry", back_populates="product")
+
+class Swipe(Base):
+    __tablename__ = "swipes"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    product_id = Column(Integer, ForeignKey("products.id"))
+    direction = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="swipes")
+    product = relationship("Product", back_populates="swipes")
+
+class WishlistItem(Base):
+    __tablename__ = "wishlist_items"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    product_id = Column(Integer, ForeignKey("products.id"))
+    added_at = Column(DateTime(timezone=True), server_default=func.now())
+    notified_price_drop = Column(Boolean, default=False)
+
+    user = relationship("User", back_populates="wishlist_items")
+    product = relationship("Product", back_populates="wishlist_items")
+
+class Battle(Base):
+    __tablename__ = "battles"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String)
+    description = Column(Text, nullable=True)
+    prize_description = Column(String)
+    prize_type = Column(String)
+    prize_value = Column(Integer)
+    status = Column(String, default="active")
+    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    ended_at = Column(DateTime(timezone=True), nullable=True)
+
+    entries = relationship("BattleEntry", back_populates="battle")
+    votes = relationship("Vote", back_populates="battle")
+
+class BattleEntry(Base):
+    __tablename__ = "battle_entries"
+    id = Column(Integer, primary_key=True, index=True)
+    battle_id = Column(Integer, ForeignKey("battles.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
+    outfit_items = Column(JSON, nullable=True)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    vote_count = Column(Integer, default=0)
+
+    battle = relationship("Battle", back_populates="entries")
+    user = relationship("User", back_populates="battle_entries")
+    product = relationship("Product", back_populates="battle_entries")
+
+class Vote(Base):
+    __tablename__ = "votes"
+    id = Column(Integer, primary_key=True, index=True)
+    battle_id = Column(Integer, ForeignKey("battles.id"))
+    entry_id = Column(Integer, ForeignKey("battle_entries.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    battle = relationship("Battle", back_populates="votes")
+    entry = relationship("BattleEntry")
+    user = relationship("User", back_populates="votes")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    type = Column(String)
+    title = Column(String)
+    message = Column(Text)
+    data = Column(JSON, nullable=True)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="notifications")
+
+class SharedWishlist(Base):
+    __tablename__ = "shared_wishlists"
+    id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    shared_with_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", foreign_keys=[owner_id], back_populates="shared_wishlists")
+    shared_with = relationship("User", foreign_keys=[shared_with_id])
+
+class PriceDrop(Base):
+    __tablename__ = "price_drops"
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"))
+    old_price = Column(Float)
+    new_price = Column(Float)
+    detected_at = Column(DateTime(timezone=True), server_default=func.now())
+    notified = Column(Boolean, default=False)
+
+    product = relationship("Product")
+=== app/schemas.py ===
+from pydantic import BaseModel
+from typing import Optional, List, Any
+from datetime import datetime
+
+class UserBase(BaseModel):
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: str
+    last_name: Optional[str] = None
+    photo_url: Optional[str] = None
+
+class UserCreate(UserBase):
+    pass
+
+class User(UserBase):
+    id: int
+    is_premium: bool
+    stars_balance: int
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+class ProductBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: float
+    old_price: Optional[float] = None
+    currency: str = "RUB"
+    image_url: str
+    category: str
+    style: str
+    brand: Optional[str] = None
+    marketplace_url: str
+    marketplace: str
+    is_sponsored: bool = False
+    sponsor_brand: Optional[str] = None
+
+class ProductCreate(ProductBase):
+    pass
+
+class Product(ProductBase):
+    id: int
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+class SwipeCreate(BaseModel):
+    product_id: int
+    direction: str
+
+class Swipe(BaseModel):
+    id: int
+    user_id: int
+    product_id: int
+    direction: str
+    created_at: datetime
+
+class WishlistItemBase(BaseModel):
+    product_id: int
+
+class WishlistItem(WishlistItemBase):
+    id: int
+    user_id: int
+    added_at: datetime
+    product: Product
+
+class BattleCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    prize_description: str
+    prize_type: str
+    prize_value: int
+    status: str = "active"
+
+class Battle(BattleCreate):
+    id: int
+    created_by: int
+    created_at: datetime
+    ended_at: Optional[datetime]
+    entries: List['BattleEntry'] = []
+
+class BattleEntryCreate(BaseModel):
+    product_id: Optional[int] = None
+    outfit_items: Optional[List[int]] = None
+    description: Optional[str] = None
+
+class BattleEntry(BattleEntryCreate):
+    id: int
+    battle_id: int
+    user_id: int
+    created_at: datetime
+    vote_count: int
+    user: User
+    product: Optional[Product] = None
+
+class VoteCreate(BaseModel):
+    entry_id: int
+
+class NotificationBase(BaseModel):
+    type: str
+    title: str
+    message: str
+    data: Optional[Any] = None
+
+class Notification(NotificationBase):
+    id: int
+    user_id: int
+    is_read: bool
+    created_at: datetime
+
+class SharedWishlistCreate(BaseModel):
+    shared_with_id: int
+
+class SharedWishlist(SharedWishlistCreate):
+    id: int
+    owner_id: int
+    created_at: datetime
+
+class PriceDropSchema(BaseModel):
+    product_id: int
+    old_price: float
+    new_price: float
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    photo_url: Optional[str] = None
+=== app/auth.py ===
+import hmac
+import hashlib
+import json
+from typing import Optional
+from fastapi import HTTPException, Header, Depends
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models import User
+from app.config import Config
+
+def validate_telegram_init_data(init_data: str) -> dict:
+    params = {}
+    for part in init_data.split('&'):
+        key, value = part.split('=')
+        params[key] = value
+    if 'hash' not in params:
+        raise HTTPException(status_code=400, detail="No hash in initData")
+    hash_str = params.pop('hash')
+    data_check_string = '\n'.join([f"{k}={v}" for k, v in sorted(params.items())])
+    secret_key = hmac.new(b"WebAppData", Config.BOT_TOKEN.encode(), hashlib.sha256).digest()
+    expected_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if expected_hash != hash_str:
+        raise HTTPException(status_code=400, detail="Invalid initData hash")
+    return params
+
+async def get_current_user(
+    x_init_data: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> User:
+    if not x_init_data:
+        raise HTTPException(status_code=401, detail="Missing X-Init-Data header")
+    data = validate_telegram_init_data(x_init_data)
+    user_data = json.loads(data.get('user', '{}'))
+    if not user_data:
+        raise HTTPException(status_code=400, detail="User data missing")
+    telegram_id = user_data.get('id')
+    if not telegram_id:
+        raise HTTPException(status_code=400, detail="User id missing")
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        user = User(
+            telegram_id=telegram_id,
+            username=user_data.get('username'),
+            first_name=user_data.get('first_name', ''),
+            last_name=user_data.get('last_name'),
+            photo_url=user_data.get('photo_url')
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
+
+async def get_current_user_dev(db: Session = Depends(get_db)) -> User:
+    user = db.query(User).filter(User.telegram_id == 123456789).first()
+    if not user:
+        user = User(telegram_id=123456789, first_name="Dev", username="devuser")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
+=== app/bot.py ===
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from app.config import Config
+
+bot = Bot(token=Config.BOT_TOKEN)
+dp = Dispatcher(bot)
+
+async def send_notification(telegram_id: int, text: str, reply_markup: InlineKeyboardMarkup = None):
+    await bot.send_message(chat_id=telegram_id, text=text, reply_markup=reply_markup)
+
+@dp.message_handler(commands=['start'])
+async def start(message: types.Message):
+    await message.reply("Добро пожаловать в Swipe Fashion! Используйте мини-приложение.")
+=== app/scheduler.py ===
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from app.database import SessionLocal
+from app.models import Product, PriceDrop, Notification
+from app.utils.price_parser import fetch_price_from_marketplace
+import asyncio
+import random
+
+def check_prices():
+    db = SessionLocal()
+    products = db.query(Product).all()
+    for product in products:
+        new_price = asyncio.run(fetch_price_from_marketplace(product))
+        if new_price < product.price:
+            drop = PriceDrop(
+                product_id=product.id,
+                old_price=product.price,
+                new_price=new_price
+            )
+            db.add(drop)
+            product.old_price = product.price
+            product.price = new_price
+            # Уведомления
+            wishlist_users = db.query(Product.wishlist_items).filter(Product.id == product.id).all()
+            for user in wishlist_users:
+                notif = Notification(
+                    user_id=user.id,
+                    type="price_drop",
+                    title="Цена снизилась!",
+                    message=f"Товар {product.name} подешевел до {new_price} ₽",
+                    data={"product_id": product.id, "old_price": drop.old_price, "new_price": drop.new_price}
+                )
+                db.add(notif)
+    db.commit()
+    db.close()
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(check_prices, IntervalTrigger(hours=6))
+=== app/seed.py ===
+from app.database import SessionLocal
+from app.models import Product
+
+def seed():
+    db = SessionLocal()
+    if db.query(Product).count() == 0:
+        products = [
+            Product(
+                name="Кроссовки Nike Air Max",
+                description="Легкие, удобные, стильные",
+                price=8990.0,
+                currency="RUB",
+                image_url="https://example.com/nike.jpg",
+                category="Обувь",
+                style="sport",
+                brand="Nike",
+                marketplace_url="https://www.wildberries.ru/catalog/...",
+                marketplace="wb",
+                is_sponsored=False
+            ),
+            # добавьте ещё товары для теста
+        ]
+        db.add_all(products)
+        db.commit()
+    db.close()
+=== app/routes/__init__.py ===
+# Пустой файл
+=== app/routes/products.py ===
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy.orm import Session
+from typing import Optional, List
+from app.database import get_db
+from app.models import Product
+from app.schemas import Product as ProductSchema
+from app.auth import get_current_user
+from app.models import User
+
+router = APIRouter(prefix="/products", tags=["products"])
+
+@router.get("/", response_model=List[ProductSchema])
+def get_products(
+    category: Optional[str] = Query(None),
+    style: Optional[str] = Query(None),
+    min_price: Optional[float] = Query(None),
+    max_price: Optional[float] = Query(None),
+    limit: int = Query(20, le=100),
+    offset: int = Query(0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    query = db.query(Product)
+    if category:
+        query = query.filter(Product.category == category)
+    if style:
+        query = query.filter(Product.style == style)
+    if min_price is not None:
+        query = query.filter(Product.price >= min_price)
+    if max_price is not None:
+        query = query.filter(Product.price <= max_price)
+    swiped_product_ids = [s.product_id for s in current_user.swipes]
+    if swiped_product_ids:
+        query = query.filter(Product.id.notin_(swiped_product_ids))
+    return query.offset(offset).limit(limit).all()
+
+@router.get("/{product_id}", response_model=ProductSchema)
+def get_product(product_id: int, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
+=== app/routes/swipes.py ===
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models import Swipe, Product, WishlistItem
+from app.schemas import SwipeCreate
+from app.auth import get_current_user
+from app.models import User
+
+router = APIRouter(prefix="/swipe", tags=["swipes"])
+
+@router.post("/")
+def swipe_product(
+    swipe_data: SwipeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    product = db.query(Product).filter(Product.id == swipe_data.product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    existing = db.query(Swipe).filter(
+        Swipe.user_id == current_user.id,
+        Swipe.product_id == swipe_data.product_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Already swiped this product")
+    swipe = Swipe(
+        user_id=current_user.id,
+        product_id=swipe_data.product_id,
+        direction=swipe_data.direction
+    )
+    db.add(swipe)
+    if swipe_data.direction == "right":
+        wishlist_item = WishlistItem(
+            user_id=current_user.id,
+            product_id=swipe_data.product_id
+        )
+        db.add(wishlist_item)
+    db.commit()
+    return {"status": "ok", "direction": swipe_data.direction}
+=== app/routes/wishlist.py ===
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models import WishlistItem, Product
+from app.schemas import WishlistItem as WishlistItemSchema
+from app.auth import get_current_user
+from app.models import User
+
+router = APIRouter(prefix="/wishlist", tags=["wishlist"])
+
+@router.get("/", response_model=list[WishlistItemSchema])
+def get_wishlist(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    items = db.query(WishlistItem).filter(WishlistItem.user_id == current_user.id).all()
+    return items
+
+@router.delete("/{product_id}")
+def remove_from_wishlist(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    item = db.query(WishlistItem).filter(
+        WishlistItem.user_id == current_user.id,
+        WishlistItem.product_id == product_id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not in wishlist")
+    db.delete(item)
+    db.commit()
+    return {"status": "removed"}
+=== app/routes/battles.py ===
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from datetime import datetime
+from app.database import get_db
+from app.models import Battle, BattleEntry, Vote, User, Product, Notification
+from app.schemas import BattleCreate, BattleEntryCreate, VoteCreate
+from app.auth import get_current_user
+from app.bot import send_notification
+
+router = APIRouter(prefix="/battles", tags=["battles"])
+
+@router.post("/")
+def create_battle(
+    battle_data: BattleCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    battle = Battle(
+        title=battle_data.title,
+        description=battle_data.description,
+        prize_description=battle_data.prize_description,
+        prize_type=battle_data.prize_type,
+        prize_value=battle_data.prize_value,
+        status=battle_data.status,
+        created_by=current_user.id
+    )
+    db.add(battle)
+    db.commit()
+    db.refresh(battle)
+    return battle
+
+@router.get("/active")
+def get_active_battles(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return db.query(Battle).filter(Battle.status == "active").all()
+
+@router.post("/{battle_id}/entries")
+def add_entry(
+    battle_id: int,
+    entry_data: BattleEntryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    battle = db.query(Battle).filter(Battle.id == battle_id).first()
+    if not battle or battle.status != "active":
+        raise HTTPException(status_code=400, detail="Battle not active")
+    existing = db.query(BattleEntry).filter(
+        BattleEntry.battle_id == battle_id,
+        BattleEntry.user_id == current_user.id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Already participating")
+    entry = BattleEntry(
+        battle_id=battle_id,
+        user_id=current_user.id,
+        product_id=entry_data.product_id,
+        outfit_items=entry_data.outfit_items,
+        description=entry_data.description
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@router.post("/{battle_id}/vote")
+def vote(
+    battle_id: int,
+    vote_data: VoteCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    battle = db.query(Battle).filter(Battle.id == battle_id).first()
+    if not battle or battle.status != "active":
+        raise HTTPException(status_code=400, detail="Battle not active")
+    entry = db.query(BattleEntry).filter(BattleEntry.id == vote_data.entry_id).first()
+    if not entry or entry.battle_id != battle_id:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    existing = db.query(Vote).filter(
+        Vote.battle_id == battle_id,
+        Vote.user_id == current_user.id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Already voted in this battle")
+    vote = Vote(
+        battle_id=battle_id,
+        entry_id=vote_data.entry_id,
+        user_id=current_user.id
+    )
+    db.add(vote)
+    entry.vote_count += 1
+    db.commit()
+    return {"status": "voted"}
+
+@router.post("/{battle_id}/end")
+def end_battle(
+    battle_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    battle = db.query(Battle).filter(Battle.id == battle_id).first()
+    if not battle:
+        raise HTTPException(status_code=404, detail="Battle not found")
+    if battle.created_by != current_user.id and not current_user.is_premium:
+        raise HTTPException(status_code=403, detail="Not allowed")
+    battle.status = "ended"
+    battle.ended_at = datetime.utcnow()
+    winner_entry = db.query(BattleEntry).filter(BattleEntry.battle_id == battle_id).order_by(BattleEntry.vote_count.desc()).first()
+    if winner_entry:
+        winner = winner_entry.user
+        if battle.prize_type == "premium":
+            winner.is_premium = True
+        elif battle.prize_type == "stars":
+            winner.stars_balance += battle.prize_value
+        db.commit()
+        notification = Notification(
+            user_id=winner.id,
+            type="battle_win",
+            title="Вы победили в батле!",
+            message=f"Поздравляем! Вы выиграли {battle.prize_description}",
+            data={"battle_id": battle.id}
+        )
+        db.add(notification)
+        db.commit()
+        await send_notification(winner.telegram_id, notification.message)
+    db.commit()
+    return {"status": "battle ended", "winner_id": winner_entry.user_id if winner_entry else None}
+=== app/routes/notifications.py ===
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models import Notification
+from app.schemas import Notification as NotificationSchema
+from app.auth import get_current_user
+from app.models import User
+
+router = APIRouter(prefix="/notifications", tags=["notifications"])
+
+@router.get("/", response_model=list[NotificationSchema])
+def get_notifications(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return db.query(Notification).filter(Notification.user_id == current_user.id).order_by(Notification.created_at.desc()).all()
+
+@router.put("/{notification_id}/read")
+def mark_read(notification_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    notif = db.query(Notification).filter(Notification.id == notification_id, Notification.user_id == current_user.id).first()
+    if notif:
+        notif.is_read = True
+        db.commit()
+    return {"status": "ok"}
+=== app/routes/shared.py ===
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models import SharedWishlist, User
+from app.schemas import SharedWishlistCreate, SharedWishlist as SharedWishlistSchema
+from app.auth import get_current_user
+
+router = APIRouter(prefix="/shared", tags=["shared_wishlists"])
+
+@router.post("/")
+def share_wishlist(
+    share_data: SharedWishlistCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    friend = db.query(User).filter(User.id == share_data.shared_with_id).first()
+    if not friend:
+        raise HTTPException(status_code=404, detail="User not found")
+    existing = db.query(SharedWishlist).filter(
+        SharedWishlist.owner_id == current_user.id,
+        SharedWishlist.shared_with_id == share_data.shared_with_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Already shared")
+    share = SharedWishlist(
+        owner_id=current_user.id,
+        shared_with_id=share_data.shared_with_id
+    )
+    db.add(share)
+    db.commit()
+    db.refresh(share)
+    return share
+
+@router.get("/")
+def get_shared_with_me(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return db.query(SharedWishlist).filter(SharedWishlist.shared_with_id == current_user.id).all()
+=== app/routes/users.py ===
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models import User
+from app.schemas import User as UserSchema, UserUpdate
+from app.auth import get_current_user
+
+router = APIRouter(prefix="/users", tags=["users"])
+
+@router.get("/me", response_model=UserSchema)
+def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+@router.put("/me")
+def update_me(update: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    for key, value in update.dict(exclude_unset=True).items():
+        setattr(current_user, key, value)
+    db.commit()
+    return {"status": "updated"}
+=== app/utils/__init__.py ===
+# Пустой файл
+=== app/utils/price_parser.py ===
+import random
+
+async def fetch_price_from_marketplace(product):
+    # Заглушка: возвращаем цену со случайным изменением
+    return product.price * (0.85 + 0.3 * random.random())
+=== app/main.py ===
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.routes import products, swipes, wishlist, battles, notifications, shared, users
+from app.database import engine, Base
+from app.scheduler import scheduler
+from app.bot import dp, bot
+import asyncio
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Swipe Fashion API", version="2.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(products.router)
+app.include_router(swipes.router)
+app.include_router(wishlist.router)
+app.include_router(battles.router)
+app.include_router(notifications.router)
+app.include_router(shared.router)
+app.include_router(users.router)
+
+@app.on_event("startup")
+async def startup():
+    asyncio.create_task(dp.start_polling())
+    scheduler.start()
+
+@app.on_event("shutdown")
+async def shutdown():
+    scheduler.shutdown()
+
+@app.get("/")
+def read_root():
+    return {"message": "Swipe Fashion API is running!"}
+=== requirements.txt ===
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+sqlalchemy==2.0.30
+alembic==1.13.1
+psycopg2-binary==2.9.9
+aiogram==3.6.0
+apscheduler==3.10.4
+httpx==0.27.0
+pydantic==2.7.1
+beautifulsoup4==4.12.3
+python-dotenv==1.0.1
+=== .env.example ===
+BOT_TOKEN=your_telegram_bot_token
+DATABASE_URL=postgresql://user:password@host:5432/database
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SECRET_KEY=your-secret-key
+=== Procfile ===
+web: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+=== runtime.txt ===
+python-3.11.6
+=== railway.json ===
+{
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
+    "healthcheckPath": "/",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}
