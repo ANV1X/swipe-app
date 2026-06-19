@@ -4,7 +4,7 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "swipe_users"
     id = Column(Integer, primary_key=True, index=True)
     telegram_id = Column(Integer, unique=True, index=True)
     username = Column(String, nullable=True)
@@ -24,7 +24,7 @@ class User(Base):
     shared_wishlists = relationship("SharedWishlist", back_populates="user")
 
 class Product(Base):
-    __tablename__ = "products"
+    __tablename__ = "swipe_products"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     description = Column(Text, nullable=True)
@@ -47,10 +47,10 @@ class Product(Base):
     battle_entries = relationship("BattleEntry", back_populates="product")
 
 class Swipe(Base):
-    __tablename__ = "swipes"
+    __tablename__ = "swipe_swipes"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    product_id = Column(Integer, ForeignKey("products.id"))
+    user_id = Column(Integer, ForeignKey("swipe_users.id"))
+    product_id = Column(Integer, ForeignKey("swipe_products.id"))
     direction = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -58,10 +58,10 @@ class Swipe(Base):
     product = relationship("Product", back_populates="swipes")
 
 class WishlistItem(Base):
-    __tablename__ = "wishlist_items"
+    __tablename__ = "swipe_wishlist_items"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    product_id = Column(Integer, ForeignKey("products.id"))
+    user_id = Column(Integer, ForeignKey("swipe_users.id"))
+    product_id = Column(Integer, ForeignKey("swipe_products.id"))
     added_at = Column(DateTime(timezone=True), server_default=func.now())
     notified_price_drop = Column(Boolean, default=False)
 
@@ -69,7 +69,7 @@ class WishlistItem(Base):
     product = relationship("Product", back_populates="wishlist_items")
 
 class Battle(Base):
-    __tablename__ = "battles"
+    __tablename__ = "swipe_battles"
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String)
     description = Column(Text, nullable=True)
@@ -77,7 +77,7 @@ class Battle(Base):
     prize_type = Column(String)
     prize_value = Column(Integer)
     status = Column(String, default="active")
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_by = Column(Integer, ForeignKey("swipe_users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     ended_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -85,11 +85,11 @@ class Battle(Base):
     votes = relationship("Vote", back_populates="battle")
 
 class BattleEntry(Base):
-    __tablename__ = "battle_entries"
+    __tablename__ = "swipe_battle_entries"
     id = Column(Integer, primary_key=True, index=True)
-    battle_id = Column(Integer, ForeignKey("battles.id"))
-    user_id = Column(Integer, ForeignKey("users.id"))
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
+    battle_id = Column(Integer, ForeignKey("swipe_battles.id"))
+    user_id = Column(Integer, ForeignKey("swipe_users.id"))
+    product_id = Column(Integer, ForeignKey("swipe_products.id"), nullable=True)
     outfit_items = Column(JSON, nullable=True)
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -100,11 +100,11 @@ class BattleEntry(Base):
     product = relationship("Product", back_populates="battle_entries")
 
 class Vote(Base):
-    __tablename__ = "votes"
+    __tablename__ = "swipe_votes"
     id = Column(Integer, primary_key=True, index=True)
-    battle_id = Column(Integer, ForeignKey("battles.id"))
-    entry_id = Column(Integer, ForeignKey("battle_entries.id"))
-    user_id = Column(Integer, ForeignKey("users.id"))
+    battle_id = Column(Integer, ForeignKey("swipe_battles.id"))
+    entry_id = Column(Integer, ForeignKey("swipe_battle_entries.id"))
+    user_id = Column(Integer, ForeignKey("swipe_users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     battle = relationship("Battle", back_populates="votes")
@@ -112,9 +112,9 @@ class Vote(Base):
     user = relationship("User", back_populates="votes")
 
 class Notification(Base):
-    __tablename__ = "notifications"
+    __tablename__ = "swipe_notifications"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("swipe_users.id"))
     type = Column(String)
     title = Column(String)
     message = Column(Text)
@@ -125,19 +125,19 @@ class Notification(Base):
     user = relationship("User", back_populates="notifications")
 
 class SharedWishlist(Base):
-    __tablename__ = "shared_wishlists"
+    __tablename__ = "swipe_shared_wishlists"
     id = Column(Integer, primary_key=True, index=True)
-    owner_id = Column(Integer, ForeignKey("users.id"))
-    shared_with_id = Column(Integer, ForeignKey("users.id"))
+    owner_id = Column(Integer, ForeignKey("swipe_users.id"))
+    shared_with_id = Column(Integer, ForeignKey("swipe_users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", foreign_keys=[owner_id], back_populates="shared_wishlists")
     shared_with = relationship("User", foreign_keys=[shared_with_id])
 
 class PriceDrop(Base):
-    __tablename__ = "price_drops"
+    __tablename__ = "swipe_price_drops"
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"))
+    product_id = Column(Integer, ForeignKey("swipe_products.id"))
     old_price = Column(Float)
     new_price = Column(Float)
     detected_at = Column(DateTime(timezone=True), server_default=func.now())
