@@ -12,6 +12,7 @@ import DealsPage from './pages/DealsPage'
 import HistoryPage from './pages/HistoryPage'
 import SettingsPage from './pages/SettingsPage'
 import OnboardingPage from './pages/OnboardingPage'
+import AdminPage from './pages/AdminPage'
 import { supabase } from './lib/supabase'
 import { ThemeProvider } from './lib/theme'
 import './styles.css'
@@ -67,6 +68,7 @@ function AppShell() {
           <Route path="/profile"     element={<ProfilePage />} />
           <Route path="/history"     element={<HistoryPage />} />
           <Route path="/settings"    element={<SettingsPage />} />
+          <Route path="/admin"       element={<AdminPage />} />
         </Routes>
       </main>
 

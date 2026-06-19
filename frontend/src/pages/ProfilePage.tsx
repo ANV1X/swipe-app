@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Settings, Clock, Layers, SlidersHorizontal, ChevronRight, Bell } from 'lucide-react'
+import { Settings, Clock, Layers, SlidersHorizontal, ChevronRight, Bell, Shield } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import NotificationsSheet from '../components/NotificationsSheet'
 import { useToast } from '../components/Toast'
@@ -105,8 +105,15 @@ export default function ProfilePage() {
           <div className="profile-menu-icon"><Settings size={18} /></div>
           <div className="profile-menu-label">Настройки</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginRight: 4 }}>
-            {theme === 'dark' ? '🌙 Тёмная' : '☀️ Светлая'}
+            {theme === 'dark' ? 'Тёмная' : 'Светлая'}
           </div>
+          <ChevronRight size={16} className="profile-menu-arrow" />
+        </div>
+        <div className="profile-menu-item" onClick={() => navigate('/admin')}>
+          <div className="profile-menu-icon" style={{ background: 'rgba(255,159,10,0.12)', color: 'var(--orange)' }}>
+            <Shield size={18} />
+          </div>
+          <div className="profile-menu-label">Админ панель</div>
           <ChevronRight size={16} className="profile-menu-arrow" />
         </div>
       </div>

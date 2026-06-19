@@ -1,61 +1,52 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, Users, Heart, Bookmark, X, ChevronRight } from 'lucide-react'
+import { UserPlus, Users, Heart, Bookmark, X, ChevronRight, Plus, Copy, Check, Share2, Trash2 } from 'lucide-react'
 import { supabase, Friend, Product } from '../lib/supabase'
 import { useToast } from '../components/Toast'
 
 const TABS = ['Активность', 'Общие вишлисты']
 
-const SHARED_WISHLISTS = [
-  {
-    name: 'Летний шопинг',
-    members: [
-      { initials: 'СА', color: '#FF9F0A' },
-      { initials: 'МА', color: '#FF6B6B' },
-    ],
-    count: 12,
-    previewProducts: [
-      'https://images.pexels.com/photos/1124468/pexels-photo-1124468.jpeg?auto=compress&cs=tinysrgb&w=200',
-      'https://images.pexels.com/photos/2529148/pexels-photo-2529148.jpeg?auto=compress&cs=tinysrgb&w=200',
-      'https://images.pexels.com/photos/1152077/pexels-photo-1152077.jpeg?auto=compress&cs=tinysrgb&w=200',
-    ],
-  },
-  {
-    name: 'Подарки 🎁',
-    members: [
-      { initials: 'ИЛ', color: '#34C759' },
-      { initials: 'КА', color: '#FF375F' },
-      { initials: 'СА', color: '#FF9F0A' },
-    ],
-    count: 8,
-    previewProducts: [
-      'https://images.pexels.com/photos/190819/pexels-photo-190819.jpeg?auto=compress&cs=tinysrgb&w=200',
-      'https://images.pexels.com/photos/1458867/pexels-photo-1458867.jpeg?auto=compress&cs=tinysrgb&w=200',
-    ],
-  },
-  {
-    name: 'Офисный стиль',
-    members: [
-      { initials: 'АН', color: '#AF52DE' },
-      { initials: 'МА', color: '#FF6B6B' },
-    ],
-    count: 6,
-    previewProducts: [
-      'https://images.pexels.com/photos/297933/pexels-photo-297933.jpeg?auto=compress&cs=tinysrgb&w=200',
-      'https://images.pexels.com/photos/1082528/pexels-photo-1082528.jpeg?auto=compress&cs=tinysrgb&w=200',
-      'https://images.pexels.com/photos/1598507/pexels-photo-1598507.jpeg?auto=compress&cs=tinysrgb&w=200',
-    ],
-  },
-]
+type SharedWishlist = {
+  id: string
+  name: string
+  owner_id: string
+  is_public: boolean
+  created_at: string
+  member_count?: number
+  product_count?: number
+  preview_images?: string[]
+}
 
-type FriendSheetProps = { friend: Friend; onClose: () => void }
+type WishItem = {
+  id: string
+  product_id: string
+  notify_price_drop: boolean
+  products: Product
+}
 
-function FriendSheet({ friend, onClose }: FriendSheetProps) {
-  const [wishlistItems, setWishlistItems] = useState<Product[]>([])
+function FriendSheet({ friend, onClose }: { friend: Friend; onClose: () => void }) {
+  const [wishlistItems, setWishlistItems] = useState<WishItem[]>([])
+  const { show } = useToast()
 
   useEffect(() => {
-    supabase.from('products').select('*').limit(4)
-      .then(({ data }) => setWishlistItems(data || []))
+    supabase.from('wishlist').select('*, products(*)').limit(4)
+      .then(({ data }) => setWishlistItems((data || []) as WishItem[]))
   }, [])
+
+  async function createSharedWishlist() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { show('Войдите в аккаунт'); return }
+
+    const { error } = await supabase.from('shared_wishlists').insert({
+      name: `С ${friend.friend_name}`,
+      owner_id: user.id,
+      is_public: false,
+    })
+
+    if (!error) {
+      show('Совместный вишлист создан!')
+      onClose()
+    }
+  }
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -71,14 +62,14 @@ function FriendSheet({ friend, onClose }: FriendSheetProps) {
             }}>{friend.friend_initials}</div>
             <div>
               <div className="modal-title">{friend.friend_name}</div>
-              <div style={{ fontSize: 12, color: 'var(--text2)' }}>{friend.friend_handle}</div>
+              {friend.friend_handle && <div style={{ fontSize: 12, color: 'var(--text2)' }}>@{friend.friend_handle}</div>}
             </div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={14} /></button>
         </div>
         <div className="modal-body" style={{ padding: '16px' }}>
           <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-            {[{ label: 'Свайпов', val: '843' }, { label: 'Лайков', val: '201' }, { label: 'Вишлист', val: '34' }].map(s => (
+            {[{ label: 'Свайпов', val: '—' }, { label: 'Лайков', val: '—' }, { label: 'Вишлист', val: wishlistItems.length }].map(s => (
               <div key={s.label} style={{
                 flex: 1, background: 'var(--surface2)', borderRadius: 14, padding: '12px 8px', textAlign: 'center'
               }}>
@@ -91,25 +82,33 @@ function FriendSheet({ friend, onClose }: FriendSheetProps) {
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
             Вишлист друга
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-            {wishlistItems.map(p => (
-              <div key={p.id} style={{
-                background: 'var(--surface2)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer'
-              }}>
-                <img src={p.image_url || ''} alt={p.title} style={{
-                  width: '100%', aspectRatio: '3/4', objectFit: 'cover', objectPosition: 'top', display: 'block'
-                }} />
-                <div style={{ padding: '6px 8px', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-                  {p.price.toLocaleString('ru-RU')} ₽
+          {wishlistItems.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+              {wishlistItems.slice(0, 4).map(p => (
+                <div key={p.id} style={{
+                  background: 'var(--surface2)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer'
+                }}>
+                  <img src={p.products?.image_url || ''} alt={p.products?.title} style={{
+                    width: '100%', aspectRatio: '3/4', objectFit: 'cover', objectPosition: 'top', display: 'block'
+                  }} />
+                  <div style={{ padding: '6px 8px', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                    {p.products?.price?.toLocaleString('ru-RU')} ₽
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: 20, textAlign: 'center', color: 'var(--text2)', marginBottom: 16 }}>
+              Вишлист пуст
+            </div>
+          )}
 
-          <button style={{
+          <button onClick={createSharedWishlist} style={{
             width: '100%', background: 'var(--accent)', color: '#fff', border: 'none',
-            borderRadius: 14, padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer'
+            borderRadius: 14, padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
           }}>
+            <Users size={18} />
             Создать совместный вишлист
           </button>
         </div>
@@ -118,37 +117,355 @@ function FriendSheet({ friend, onClose }: FriendSheetProps) {
   )
 }
 
+function AddFriendModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: string, handle?: string) => void }) {
+  const [name, setName] = useState('')
+  const [handle, setHandle] = useState('')
+
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{
+        width: '100%', maxWidth: 400, margin: 'auto',
+        background: 'var(--surface)', borderRadius: 20, overflow: 'hidden'
+      }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Добавить друга</h2>
+          <button onClick={onClose} style={{
+            width: 28, height: 28, borderRadius: '50%', border: 'none',
+            background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: 'var(--text2)'
+          }}><X size={14} /></button>
+        </div>
+        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Имя друга"
+            style={{
+              width: '100%', padding: 14, borderRadius: 12,
+              border: '1.5px solid var(--border)', background: 'var(--surface2)',
+              fontSize: 15, color: 'var(--text)'
+            }}
+          />
+          <input
+            type="text"
+            value={handle}
+            onChange={e => setHandle(e.target.value)}
+            placeholder="@username (необязательно)"
+            style={{
+              width: '100%', padding: 14, borderRadius: 12,
+              border: '1.5px solid var(--border)', background: 'var(--surface2)',
+              fontSize: 15, color: 'var(--text)'
+            }}
+          />
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <button onClick={onClose} style={{
+              flex: 1, padding: 14, borderRadius: 12, border: 'none',
+              background: 'var(--surface2)', color: 'var(--text)',
+              fontSize: 15, fontWeight: 600, cursor: 'pointer'
+            }}>Отмена</button>
+            <button
+              onClick={() => name.trim() && onAdd(name.trim(), handle.trim() || undefined)}
+              disabled={!name.trim()}
+              style={{
+                flex: 1, padding: 14, borderRadius: 12, border: 'none',
+                background: 'var(--accent)', color: '#fff',
+                fontSize: 15, fontWeight: 600, cursor: 'pointer', opacity: name.trim() ? 1 : 0.5
+              }}>Добавить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CreateWishlistModal({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string, isPublic: boolean) => void }) {
+  const [name, setName] = useState('')
+  const [isPublic, setIsPublic] = useState(false)
+
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{
+        width: '100%', maxWidth: 400, margin: 'auto',
+        background: 'var(--surface)', borderRadius: 20, overflow: 'hidden'
+      }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Новый вишлист</h2>
+          <button onClick={onClose} style={{
+            width: 28, height: 28, borderRadius: '50%', border: 'none',
+            background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: 'var(--text2)'
+          }}><X size={14} /></button>
+        </div>
+        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Название вишлиста"
+            style={{
+              width: '100%', padding: 14, borderRadius: 12,
+              border: '1.5px solid var(--border)', background: 'var(--surface2)',
+              fontSize: 15, color: 'var(--text)'
+            }}
+          />
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: 14, background: 'var(--surface2)', borderRadius: 12, cursor: 'pointer'
+          }}>
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={e => setIsPublic(e.target.checked)}
+              style={{ width: 20, height: 20 }}
+            />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Публичный вишлист</div>
+              <div style={{ fontSize: 12, color: 'var(--text2)' }}>Доступен всем по ссылке</div>
+            </div>
+          </label>
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <button onClick={onClose} style={{
+              flex: 1, padding: 14, borderRadius: 12, border: 'none',
+              background: 'var(--surface2)', color: 'var(--text)',
+              fontSize: 15, fontWeight: 600, cursor: 'pointer'
+            }}>Отмена</button>
+            <button
+              onClick={() => name.trim() && onCreate(name.trim(), isPublic)}
+              disabled={!name.trim()}
+              style={{
+                flex: 1, padding: 14, borderRadius: 12, border: 'none',
+                background: 'var(--accent)', color: '#fff',
+                fontSize: 15, fontWeight: 600, cursor: 'pointer', opacity: name.trim() ? 1 : 0.5
+              }}>Создать</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SharedWishlistDetail({ wishlist, onClose }: { wishlist: SharedWishlist; onClose: () => void }) {
+  const [products, setProducts] = useState<Product[]>([])
+  const { show } = useToast()
+
+  useEffect(() => {
+    supabase
+      .from('shared_wishlist_items')
+      .select('products(*)')
+      .eq('wishlist_id', wishlist.id)
+      .then(({ data }) => {
+        setProducts((data?.map((d: { products: unknown }) => d.products as Product).filter(Boolean)) || [])
+      })
+  }, [wishlist.id])
+
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal-sheet" style={{ maxWidth: 430 }}>
+        <div className="modal-handle" />
+        <div className="modal-header">
+          <div className="modal-title">{wishlist.name}</div>
+          <button className="modal-close" onClick={onClose}><X size={14} /></button>
+        </div>
+        <div className="modal-body" style={{ padding: 16 }}>
+          {products.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {products.map(p => (
+                <div key={p.id} style={{ background: 'var(--surface2)', borderRadius: 14, overflow: 'hidden' }}>
+                  <img src={p.image_url || ''} alt={p.title} style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', objectPosition: 'top' }} />
+                  <div style={{ padding: '8px 10px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 2 }}>{p.brand}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{p.price.toLocaleString('ru-RU')} ₽</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text2)' }}>
+              Добавьте товары в этот вишлист
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ActivityIcon({ activity }: { activity: string }) {
-  if (activity.includes('лайкнул') || activity.includes('сохранил')) return <Heart size={13} fill="var(--red)" stroke="none" />
-  if (activity.includes('добавила') || activity.includes('добавил')) return <Bookmark size={13} color="var(--accent)" />
-  if (activity.includes('создал')) return <Users size={13} color="var(--green)" />
+  if (activity?.includes('лайкнул') || activity?.includes('сохранил')) return <Heart size={13} fill="var(--red)" stroke="none" />
+  if (activity?.includes('добавил')) return <Bookmark size={13} color="var(--accent)" />
+  if (activity?.includes('создал')) return <Users size={13} color="var(--green)" />
   return <Heart size={13} color="var(--text3)" />
 }
 
 export default function FriendsPage() {
   const [tab, setTab] = useState('Активность')
   const [friends, setFriends] = useState<Friend[]>([])
+  const [sharedWishlists, setSharedWishlists] = useState<SharedWishlist[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null)
+  const [showAddFriend, setShowAddFriend] = useState(false)
+  const [showCreateWishlist, setShowCreateWishlist] = useState(false)
+  const [selectedWishlist, setSelectedWishlist] = useState<SharedWishlist | null>(null)
+  const [copied, setCopied] = useState(false)
   const { show, node } = useToast()
 
   useEffect(() => {
-    supabase.from('friends').select('*').order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setFriends(data || [])
-        setLoading(false)
-      })
+    loadData()
   }, [])
+
+  async function loadData() {
+    const [{ data: friendsData }, { data: swData }] = await Promise.all([
+      supabase.from('friends').select('*').order('created_at', { ascending: false }),
+      supabase.from('shared_wishlists').select('*').order('created_at', { ascending: false }),
+    ])
+
+    setFriends(friendsData || [])
+
+    // Get additional info for shared wishlists
+    if (swData && swData.length > 0) {
+      const withCounts = await Promise.all((swData as SharedWishlist[]).map(async (w) => {
+        const [{ count: memberCount }, { data: items }] = await Promise.all([
+          supabase.from('shared_wishlist_members').select('*', { count: 'exact', head: true }).eq('wishlist_id', w.id),
+          supabase.from('shared_wishlist_items').select('products(image_url)').eq('wishlist_id', w.id).limit(3),
+        ])
+        return {
+          ...w,
+          member_count: (memberCount || 0) + 1,
+          product_count: items?.length || 0,
+          preview_images: items?.map((i: { products: { image_url: string } | null }) => i.products?.image_url).filter(Boolean) || [],
+        }
+      }))
+      setSharedWishlists(withCounts)
+    }
+
+    setLoading(false)
+  }
+
+  async function addFriend(name: string, handle?: string) {
+    const colors = ['#EF4444', '#F97316', '#FBBF24', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899']
+    const color = colors[Math.floor(Math.random() * colors.length)]
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+
+    const { error } = await supabase.from('friends').insert({
+      friend_name: name,
+      friend_handle: handle || null,
+      friend_avatar_color: color,
+      friend_initials: initials,
+      last_activity: 'Только что добавлен(а)',
+      activity_time: 'сейчас',
+    })
+
+    if (!error) {
+      loadData()
+      setShowAddFriend(false)
+      show('Друг добавлен!')
+    }
+  }
+
+  async function createWishlist(name: string, isPublic: boolean) {
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      // Create without owner for anonymous
+      const { error } = await supabase.from('shared_wishlists').insert({
+        name,
+        is_public: isPublic,
+      })
+      if (!error) {
+        loadData()
+        setShowCreateWishlist(false)
+        show('Вишлист создан!')
+      }
+    } else {
+      const { error } = await supabase.from('shared_wishlists').insert({
+        name,
+        owner_id: user.id,
+        is_public: isPublic,
+      })
+      if (!error) {
+        loadData()
+        setShowCreateWishlist(false)
+        show('Вишлист создан!')
+      }
+    }
+  }
+
+  async function removeFriend(id: string) {
+    await supabase.from('friends').delete().eq('id', id)
+    setFriends(prev => prev.filter(f => f.id !== id))
+    show('Друг удалён')
+  }
+
+  const referralLink = typeof window !== 'undefined'
+    ? `${window.location.origin}?ref=your_code`
+    : ''
+
+  async function copyReferralLink() {
+    try {
+      await navigator.clipboard.writeText(referralLink)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      show('Ссылка скопирована!')
+    } catch {
+      show('Не удалось скопировать')
+    }
+  }
 
   return (
     <div className="page-bg" style={{ paddingBottom: 20 }}>
       {node}
       {selectedFriend && <FriendSheet friend={selectedFriend} onClose={() => setSelectedFriend(null)} />}
+      {selectedWishlist && <SharedWishlistDetail wishlist={selectedWishlist} onClose={() => setSelectedWishlist(null)} />}
+      {showAddFriend && <AddFriendModal onClose={() => setShowAddFriend(false)} onAdd={addFriend} />}
+      {showCreateWishlist && <CreateWishlistModal onClose={() => setShowCreateWishlist(false)} onCreate={createWishlist} />}
 
       <div className="page-header">
         <div className="page-title">Друзья</div>
-        <button className="header-action-btn" onClick={() => show('Ссылка для приглашения скопирована!')}>
-          <UserPlus size={22} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="header-action-btn"
+            onClick={copyReferralLink}
+            title="Пригласить друзей"
+          >
+            {copied ? <Check size={20} color="var(--green)" /> : <Share2 size={20} />}
+          </button>
+          <button
+            className="header-action-btn"
+            onClick={() => setShowAddFriend(true)}
+            title="Добавить друга"
+          >
+            <UserPlus size={22} />
+          </button>
+        </div>
+      </div>
+
+      {/* Referral banner */}
+      <div style={{
+        margin: '0 16px 12px',
+        background: 'linear-gradient(135deg, var(--accent-light) 0%, rgba(108,78,242,0.15) 100%)',
+        borderRadius: 16,
+        padding: '14px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+      }}>
+        <Share2 size={20} color="var(--accent)" />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Пригласите друзей</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)' }}>Получайте бонусы за каждого приглашённого</div>
+        </div>
+        <button
+          onClick={copyReferralLink}
+          style={{
+            background: 'var(--accent)', color: '#fff', border: 'none',
+            borderRadius: 10, padding: '8px 14px',
+            fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6
+          }}
+        >
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+          {copied ? 'Готово' : 'Копировать'}
         </button>
       </div>
 
@@ -170,101 +487,117 @@ export default function FriendsPage() {
             <div className="page-center" style={{ minHeight: '30vh' }}>
               <Users size={48} color="var(--text3)" />
               <div style={{ fontSize: 15, color: 'var(--text2)' }}>Нет друзей</div>
-              <div style={{ fontSize: 13, color: 'var(--text3)' }}>Пригласите друзей и смотрите их вишлисты</div>
+              <div style={{ fontSize: 13, color: 'var(--text3)' }}>Добавьте друзей и делитесь вишлистами</div>
+              <button
+                onClick={() => setShowAddFriend(true)}
+                style={{
+                  marginTop: 16, background: 'var(--accent)', color: '#fff', border: 'none',
+                  borderRadius: 12, padding: '12px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 8
+                }}
+              >
+                <UserPlus size={18} />
+                Добавить друга
+              </button>
             </div>
           ) : (
             <div className="friends-list">
               {friends.map(f => (
-                <div key={f.id} className="friend-item" onClick={() => setSelectedFriend(f)}>
+                <div key={f.id} className="friend-item">
                   <div
                     className="friend-avatar-placeholder"
                     style={{ background: f.friend_avatar_color }}
+                    onClick={() => setSelectedFriend(f)}
                   >
                     {f.friend_initials}
                   </div>
-                  <div className="friend-info">
+                  <div className="friend-info" onClick={() => setSelectedFriend(f)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span className="friend-name">{f.friend_name}</span>
-                      <span style={{ fontSize: 12, color: 'var(--text2)' }}>{f.friend_handle}</span>
+                      {f.friend_handle && <span style={{ fontSize: 12, color: 'var(--text2)' }}>@{f.friend_handle}</span>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
                       <ActivityIcon activity={f.last_activity || ''} />
-                      <span className="friend-activity">{f.last_activity}</span>
+                      <span className="friend-activity">{f.last_activity || 'Недавно'}</span>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                    <div className="friend-time">{f.activity_time}</div>
-                    <ChevronRight size={14} color="var(--text3)" />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeFriend(f.id) }}
+                    style={{
+                      padding: 8, background: 'none', border: 'none',
+                      color: 'var(--text3)', cursor: 'pointer'
+                    }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ padding: '0 16px' }}>
+          {sharedWishlists.length === 0 ? (
+            <div className="page-center" style={{ minHeight: '30vh' }}>
+              <Bookmark size={48} color="var(--text3)" />
+              <div style={{ fontSize: 15, color: 'var(--text2)' }}>Нет совместных вишлистов</div>
+              <div style={{ fontSize: 13, color: 'var(--text3)' }}>Создайте первый и делитесь с друзьями</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {sharedWishlists.map(wl => (
+                <div
+                  key={wl.id}
+                  onClick={() => setSelectedWishlist(wl)}
+                  style={{
+                    background: 'var(--surface)',
+                    borderRadius: 20,
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
+                    cursor: 'pointer',
+                    transition: 'transform 0.15s',
+                  }}
+                >
+                  {wl.preview_images && wl.preview_images.length > 0 && (
+                    <div style={{ display: 'flex', height: 90, overflow: 'hidden', gap: 2 }}>
+                      {wl.preview_images.map((url, j) => (
+                        <div key={j} style={{ flex: 1, background: 'var(--surface2)' }}>
+                          <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ padding: '12px 14px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+                        {wl.name}
+                        {wl.is_public && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--accent)' }}>Публичный</span>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text2)' }}>
+                        <Users size={12} />
+                        {wl.member_count || 1} участника · {(wl.product_count || 0)} товаров
+                      </div>
+                    </div>
+                    <div style={{
+                      background: 'var(--accent-light)', color: 'var(--accent)',
+                      borderRadius: 10, padding: '6px 12px',
+                      fontSize: 13, fontWeight: 600,
+                    }}>
+                      Открыть
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          <button className="friends-invite-btn" style={{ marginTop: 14 }} onClick={() => show('Ссылка скопирована!')}>
-            Пригласить друзей
-          </button>
-        </div>
-      ) : (
-        <div style={{ padding: '0 16px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {SHARED_WISHLISTS.map((wl, i) => (
-              <div
-                key={i}
-                style={{
-                  background: 'var(--surface)',
-                  borderRadius: 20,
-                  overflow: 'hidden',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-                  cursor: 'pointer',
-                  transition: 'transform 0.15s',
-                }}
-                onClick={() => show(`Открываем «${wl.name}»`)}
-              >
-                {/* Preview images strip */}
-                <div style={{ display: 'flex', height: 90, overflow: 'hidden', gap: 2 }}>
-                  {wl.previewProducts.map((url, j) => (
-                    <div key={j} style={{ flex: 1, background: 'var(--surface2)' }}>
-                      <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ padding: '12px 14px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{wl.name}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ display: 'flex' }}>
-                        {wl.members.map((m, j) => (
-                          <div key={j} style={{
-                            width: 24, height: 24, borderRadius: '50%',
-                            background: m.color, color: '#fff',
-                            fontSize: 9, fontWeight: 700,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            marginLeft: j > 0 ? -8 : 0,
-                            border: '2px solid var(--surface)',
-                          }}>{m.initials}</div>
-                        ))}
-                      </div>
-                      <span style={{ fontSize: 12, color: 'var(--text2)' }}>
-                        {wl.members.length} участника · {wl.count} товаров
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{
-                    background: 'var(--accent-light)', color: 'var(--accent)',
-                    borderRadius: 10, padding: '6px 12px',
-                    fontSize: 13, fontWeight: 600,
-                  }}>
-                    Открыть
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <button className="friends-invite-btn" style={{ marginTop: 14 }} onClick={() => show('Вишлист создан!')}>
-            + Создать общий вишлист
+          <button
+            onClick={() => setShowCreateWishlist(true)}
+            className="friends-invite-btn"
+            style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          >
+            <Plus size={18} />
+            Создать общий вишлист
           </button>
         </div>
       )}
