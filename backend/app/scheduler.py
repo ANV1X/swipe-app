@@ -1,16 +1,14 @@
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from app.database import SessionLocal
 from app.models import Product, PriceDrop, Notification
 from app.utils.price_parser import fetch_price_from_marketplace
-import asyncio
-import random
 
-def check_prices():
+async def check_prices():
     db = SessionLocal()
     products = db.query(Product).all()
     for product in products:
-        new_price = asyncio.run(fetch_price_from_marketplace(product))
+        new_price = await fetch_price_from_marketplace(product)
         if new_price < product.price:
             drop = PriceDrop(
                 product_id=product.id,
@@ -20,7 +18,7 @@ def check_prices():
             db.add(drop)
             product.old_price = product.price
             product.price = new_price
-            # Уведомления
+            # уведомления
             wishlist_users = db.query(Product.wishlist_items).filter(Product.id == product.id).all()
             for user in wishlist_users:
                 notif = Notification(
@@ -34,5 +32,5 @@ def check_prices():
     db.commit()
     db.close()
 
-scheduler = BackgroundScheduler()
+scheduler = AsyncIOScheduler()
 scheduler.add_job(check_prices, IntervalTrigger(hours=6))
