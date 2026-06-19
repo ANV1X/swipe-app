@@ -1,144 +1,156 @@
-import { useState } from 'react'
-import { Search, Plus, ChevronRight, ArrowLeft } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, Search, ChevronRight, ArrowLeft, Check } from 'lucide-react'
+import { supabase, Collection, Product } from '../lib/supabase'
+import { useToast } from '../components/Toast'
 
-interface Collection {
-  id: number
-  name: string
-  author: string
-  subscribers: string
-  image: string
+function formatPrice(p: number) {
+  return p.toLocaleString('ru-RU') + ' ₽'
 }
 
-const COLLECTIONS: Collection[] = [
-  {
-    id: 1,
-    name: 'Minimal до 5000 ₽',
-    author: 'by Anna',
-    subscribers: '432 подписчика',
-    image: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=200',
-  },
-  {
-    id: 2,
-    name: 'Лето 2026',
-    author: 'by Style.ru',
-    subscribers: '691 подписчик',
-    image: 'https://images.pexels.com/photos/1055691/pexels-photo-1055691.jpeg?auto=compress&cs=tinysrgb&w=200',
-  },
-  {
-    id: 3,
-    name: 'Лучшие кроссы',
-    author: 'by Nike Fan',
-    subscribers: '1 204 подписчика',
-    image: 'https://images.pexels.com/photos/2529148/pexels-photo-2529148.jpeg?auto=compress&cs=tinysrgb&w=200',
-  },
-  {
-    id: 4,
-    name: 'Офисный гардероб',
-    author: 'by WorkStyle',
-    subscribers: '743 подписчика',
-    image: 'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=200',
-  },
-  {
-    id: 5,
-    name: 'Базовый гардероб',
-    author: 'by Minimal',
-    subscribers: '832 подписчика',
-    image: 'https://images.pexels.com/photos/1040945/pexels-photo-1040945.jpeg?auto=compress&cs=tinysrgb&w=200',
-  },
-]
+function formatSubs(n: number) {
+  if (n >= 1000) return (n / 1000).toFixed(1).replace('.0', '') + ' тыс. подписчиков'
+  return n + ' подписчиков'
+}
 
-const COLLECTION_ITEMS = [
-  { id: 1, price: '2 990 ₽', image: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 2, price: '2 480 ₽', image: 'https://images.pexels.com/photos/1183266/pexels-photo-1183266.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 3, price: '3 990 ₽', image: 'https://images.pexels.com/photos/1598505/pexels-photo-1598505.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 4, price: '2 190 ₽', image: 'https://images.pexels.com/photos/1040945/pexels-photo-1040945.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 5, price: '3 480 ₽', image: 'https://images.pexels.com/photos/1055691/pexels-photo-1055691.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 6, price: '1 990 ₽', image: 'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=300' },
-]
+type DetailProps = { collection: Collection; onBack: () => void }
 
-export default function CollectionsPage() {
-  const [activeTab, setActiveTab] = useState<'popular' | 'new' | 'subs'>('popular')
-  const [detail, setDetail] = useState<Collection | null>(null)
-  const [subscribed, setSubscribed] = useState<Set<number>>(new Set())
+function CollectionDetail({ collection, onBack }: DetailProps) {
+  const [items, setItems] = useState<Product[]>([])
+  const [subscribed, setSubscribed] = useState(false)
+  const { show, node } = useToast()
 
-  if (detail) {
-    return (
-      <div className="collections-page main-content" style={{ paddingBottom: 90 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px 12px' }}>
-          <button
-            onClick={() => setDetail(null)}
-            style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{detail.name}</span>
-        </div>
+  useEffect(() => {
+    supabase
+      .from('collection_items')
+      .select('products(*)')
+      .eq('collection_id', collection.id)
+      .then(({ data }) => {
+        setItems((data || []).map((d: any) => d.products).filter(Boolean))
+      })
+  }, [collection.id])
 
-        <div className="collection-detail-hero">
-          <img src={detail.image} className="collection-detail-avatar" alt="" />
-          <div>
-            <div className="collection-detail-name">{detail.name}</div>
-            <div className="collection-detail-author">{detail.author} · {detail.subscribers}</div>
-          </div>
-        </div>
-
-        <button
-          className={`collection-subscribe-btn ${subscribed.has(detail.id) ? 'subscribed' : ''}`}
-          onClick={() => setSubscribed(prev => {
-            const next = new Set(prev)
-            next.has(detail.id) ? next.delete(detail.id) : next.add(detail.id)
-            return next
-          })}
-        >
-          {subscribed.has(detail.id) ? 'Подписан' : 'Подписаться'}
-        </button>
-
-        <div className="collection-detail-count">15 товаров</div>
-
-        <div className="collection-grid">
-          {COLLECTION_ITEMS.map(item => (
-            <div key={item.id} className="collection-grid-item">
-              <img src={item.image} className="collection-grid-item__img" alt="" />
-              <div className="collection-grid-item__price">{item.price}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
+  function handleSubscribe() {
+    setSubscribed(s => !s)
+    show(subscribed ? 'Отписались от коллекции' : 'Подписались на коллекцию!')
   }
 
+  const initials = collection.author_name.slice(0, 2).toUpperCase()
+
   return (
-    <div className="collections-page">
+    <div className="page-bg">
+      {node}
       <div className="page-header">
-        <span className="page-title">Коллекции</span>
+        <button className="back-btn" onClick={onBack}><ArrowLeft size={18} /></button>
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <div style={{ fontSize: 17, fontWeight: 700 }}>{collection.name}</div>
+        </div>
+        <div style={{ width: 36 }} />
+      </div>
+
+      <div className="collection-detail-hero">
+        <div className="collection-detail-avatar">{initials}</div>
+        <div>
+          <div className="collection-detail-author">by {collection.author_name}</div>
+          <div className="collection-detail-name">{formatSubs(collection.subscribers_count)}</div>
+        </div>
+      </div>
+
+      <div className="collection-detail-count">{items.length} товаров</div>
+
+      <button
+        className={`collection-subscribe-btn${subscribed ? ' subscribed' : ''}`}
+        onClick={handleSubscribe}
+      >
+        {subscribed ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Check size={16} /> Вы подписаны</span> : 'Подписаться'}
+      </button>
+
+      <div className="collection-grid">
+        {items.map(item => (
+          <div key={item.id} className="collection-grid-item">
+            <img
+              className="collection-grid-item__img"
+              src={item.image_url || ''}
+              alt={item.title}
+            />
+            <div className="collection-grid-item__price">{formatPrice(item.price)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const TABS = ['Популярные', 'Новинки', 'Подписки']
+
+export default function CollectionsPage() {
+  const [collections, setCollections] = useState<Collection[]>([])
+  const [query, setQuery] = useState('')
+  const [tab, setTab] = useState('Популярные')
+  const [selected, setSelected] = useState<Collection | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    supabase.from('collections').select('*').order('subscribers_count', { ascending: false })
+      .then(({ data }) => {
+        setCollections(data || [])
+        setLoading(false)
+      })
+  }, [])
+
+  if (selected) return <CollectionDetail collection={selected} onBack={() => setSelected(null)} />
+
+  const filtered = collections.filter(c =>
+    c.name.toLowerCase().includes(query.toLowerCase()) ||
+    c.author_name.toLowerCase().includes(query.toLowerCase())
+  )
+
+  return (
+    <div className="page-bg">
+      <div className="page-header">
+        <div className="page-title">Коллекции</div>
         <button className="header-action-btn"><Plus size={22} /></button>
       </div>
 
       <div className="search-bar-wrap">
         <div className="search-bar">
           <Search size={16} color="var(--text3)" />
-          <input placeholder="Поиск коллекций" />
+          <input
+            placeholder="Поиск коллекций"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
         </div>
       </div>
 
       <div className="collections-tabs">
-        <button className={`collections-tab ${activeTab === 'popular' ? 'active' : ''}`} onClick={() => setActiveTab('popular')}>Популярные</button>
-        <button className={`collections-tab ${activeTab === 'new' ? 'active' : ''}`} onClick={() => setActiveTab('new')}>Новые</button>
-        <button className={`collections-tab ${activeTab === 'subs' ? 'active' : ''}`} onClick={() => setActiveTab('subs')}>Подписки</button>
-      </div>
-
-      <div className="collection-list">
-        {COLLECTIONS.map(col => (
-          <div key={col.id} className="collection-item" onClick={() => setDetail(col)}>
-            <img src={col.image} className="collection-item__img" alt="" />
-            <div className="collection-item__info">
-              <div className="collection-item__name">{col.name}</div>
-              <div className="collection-item__subs">{col.subscribers}</div>
-            </div>
-            <ChevronRight size={18} className="collection-item__arrow" />
-          </div>
+        {TABS.map(t => (
+          <button key={t} className={`collections-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
+
+      {loading ? (
+        <div className="page-center"><div className="spinner" /></div>
+      ) : (
+        <div style={{ padding: '0 16px' }}>
+          <div className="collection-list">
+            {filtered.map(c => (
+              <div key={c.id} className="collection-item" onClick={() => setSelected(c)}>
+                <img
+                  className="collection-item__img"
+                  src={c.cover_image || ''}
+                  alt={c.name}
+                />
+                <div className="collection-item__info">
+                  <div className="collection-item__name">{c.name}</div>
+                  <div className="collection-item__subs">{formatSubs(c.subscribers_count)}</div>
+                </div>
+                <ChevronRight size={18} className="collection-item__arrow" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

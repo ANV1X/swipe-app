@@ -1,129 +1,164 @@
-import { useState } from 'react'
-import { Settings2, Trash2 } from 'lucide-react'
-
-interface WishItem {
-  id: number
-  brand: string
-  name: string
-  store: string
-  price: string
-  oldPrice?: string
-  discount?: string
-  image: string
-  url: string
-}
-
-const ITEMS: WishItem[] = [
-  {
-    id: 1,
-    brand: 'Zara',
-    name: 'Куртка оверсайз',
-    store: 'Zara',
-    price: '5 999 ₽',
-    discount: '+15%',
-    image: 'https://images.pexels.com/photos/1040945/pexels-photo-1040945.jpeg?auto=compress&cs=tinysrgb&w=300',
-    url: '#',
-  },
-  {
-    id: 2,
-    brand: 'New Balance',
-    name: 'Кроссовки 530',
-    store: 'New Balance',
-    price: '9 990 ₽',
-    image: 'https://images.pexels.com/photos/2529148/pexels-photo-2529148.jpeg?auto=compress&cs=tinysrgb&w=300',
-    url: '#',
-  },
-  {
-    id: 3,
-    brand: 'Casio',
-    name: 'Часы Casio Vintage',
-    store: 'Casio',
-    price: '3 490 ₽',
-    discount: '-10%',
-    image: 'https://images.pexels.com/photos/190819/pexels-photo-190819.jpeg?auto=compress&cs=tinysrgb&w=300',
-    url: '#',
-  },
-  {
-    id: 4,
-    brand: 'Arny Praht',
-    name: 'Сумка шоппер',
-    store: 'Arny Praht',
-    price: '2 180 ₽',
-    oldPrice: '2 900 ₽',
-    discount: '-25%',
-    image: 'https://images.pexels.com/photos/1152077/pexels-photo-1152077.jpeg?auto=compress&cs=tinysrgb&w=300',
-    url: '#',
-  },
-]
+import { useEffect, useState } from 'react'
+import { Bell, BellOff, ExternalLink, Trash2, ShoppingBag } from 'lucide-react'
+import { supabase, Product, getAnonId } from '../lib/supabase'
+import { useToast } from '../components/Toast'
 
 const CATEGORIES = ['Все', 'Одежда', 'Обувь', 'Аксессуары']
 
-export default function WishlistPage() {
-  const [activeCategory, setActiveCategory] = useState('Все')
-  const [items, setItems] = useState(ITEMS)
+function formatPrice(p: number) {
+  return p.toLocaleString('ru-RU') + ' ₽'
+}
 
-  function removeItem(id: number) {
-    setItems(prev => prev.filter(i => i.id !== id))
+type WishItem = {
+  id: string
+  product_id: string
+  notify_price_drop: boolean
+  products: Product
+}
+
+export default function WishlistPage() {
+  const [items, setItems] = useState<WishItem[]>([])
+  const [category, setCategory] = useState('Все')
+  const [loading, setLoading] = useState(true)
+  const { show, node } = useToast()
+  const userId = getAnonId()
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase
+      .from('wishlist')
+      .select('*, products(*)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    setItems((data || []) as WishItem[])
+    setLoading(false)
   }
 
+  async function removeItem(id: string) {
+    await supabase.from('wishlist').delete().eq('id', id)
+    setItems(prev => prev.filter(i => i.id !== id))
+    show('Удалено из вишлиста')
+  }
+
+  async function toggleNotify(item: WishItem) {
+    const newVal = !item.notify_price_drop
+    await supabase.from('wishlist').update({ notify_price_drop: newVal }).eq('id', item.id)
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, notify_price_drop: newVal } : i))
+    show(newVal ? 'Уведомления о скидке включены' : 'Уведомления отключены')
+  }
+
+  const filtered = category === 'Все'
+    ? items
+    : items.filter(i => i.products?.category === category)
+
+  const totalOld = filtered.reduce((sum, i) => sum + (i.products?.price_old || i.products?.price || 0), 0)
+  const totalNew = filtered.reduce((sum, i) => sum + (i.products?.price || 0), 0)
+  const saved = totalOld - totalNew
+
   return (
-    <div className="wishlist-page">
+    <div className="page-bg">
+      {node}
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="page-title">Вишлист</span>
-          <span style={{
-            background: 'var(--accent)', color: '#fff',
-            fontSize: 12, fontWeight: 700,
-            padding: '2px 8px', borderRadius: 20
-          }}>{items.length}</span>
+        <div className="page-title">
+          Вишлист
+          {items.length > 0 && (
+            <span style={{
+              marginLeft: 8, background: 'var(--accent)', color: '#fff',
+              fontSize: 13, fontWeight: 700, borderRadius: 10,
+              padding: '2px 8px', verticalAlign: 'middle'
+            }}>{items.length}</span>
+          )}
         </div>
-        <button className="header-action-btn"><Settings2 size={20} /></button>
       </div>
 
       <div className="filter-bar">
-        {CATEGORIES.map(cat => (
+        {CATEGORIES.map(c => (
           <button
-            key={cat}
-            className={`filter-chip ${activeCategory === cat ? 'active' : ''}`}
-            onClick={() => setActiveCategory(cat)}
-          >
-            {cat}
-          </button>
+            key={c}
+            className={`filter-chip${category === c ? ' active' : ''}`}
+            onClick={() => setCategory(c)}
+          >{c}</button>
         ))}
       </div>
 
-      <div className="wishlist-list">
-        {items.map(item => (
-          <div key={item.id} className="wishlist-item">
-            <img src={item.image} className="wishlist-item__img" alt={item.name} />
-            <div className="wishlist-item__info">
-              <div className="wishlist-item__brand">{item.brand}</div>
-              <div className="wishlist-item__name">{item.name}</div>
-              <div className="wishlist-item__store">{item.store}</div>
-              <div className="wishlist-item__price-row">
-                <span className="wishlist-item__price">{item.price}</span>
-                {item.oldPrice && <span className="wishlist-item__price-old">{item.oldPrice}</span>}
-                {item.discount && (
-                  <span className="wishlist-item__discount-badge">{item.discount}</span>
-                )}
+      {loading ? (
+        <div className="page-center"><div className="spinner" /></div>
+      ) : filtered.length === 0 ? (
+        <div className="page-center">
+          <ShoppingBag size={48} color="var(--text3)" />
+          <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>Вишлист пуст</div>
+          <div style={{ fontSize: 14, color: 'var(--text2)' }}>Сохраняйте понравившиеся товары</div>
+        </div>
+      ) : (
+        <>
+          {saved > 0 && (
+            <div style={{
+              margin: '0 16px 12px',
+              background: 'rgba(52,199,89,0.10)',
+              border: '1px solid rgba(52,199,89,0.2)',
+              borderRadius: 14,
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10
+            }}>
+              <span style={{ fontSize: 20 }}>💰</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--green)' }}>Экономия {formatPrice(saved)}</div>
+                <div style={{ fontSize: 12, color: 'var(--text2)' }}>по сравнению со старыми ценами</div>
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', flexShrink: 0 }}>
-              <button
-                onClick={() => removeItem(item.id)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 4 }}
-              >
-                <Trash2 size={16} />
-              </button>
-              <a href={item.url} className="wishlist-buy-btn">Купить</a>
-            </div>
-          </div>
-        ))}
-      </div>
+          )}
 
-      <div className="wishlist-footer">
-        <button className="btn-primary">Перейти к покупкам</button>
-      </div>
+          <div className="wishlist-list">
+            {filtered.map(item => {
+              const p = item.products
+              if (!p) return null
+              const disc = p.price_old ? Math.round((1 - p.price / p.price_old) * 100) : null
+              return (
+                <div key={item.id} className="wishlist-item">
+                  <img className="wishlist-item__img" src={p.image_url || ''} alt={p.title} />
+                  <div className="wishlist-item__info">
+                    <div className="wishlist-item__brand">{p.brand || p.marketplace}</div>
+                    <div className="wishlist-item__name">{p.title}</div>
+                    <div className="wishlist-item__store">{p.marketplace}</div>
+                    <div className="wishlist-item__price-row">
+                      <span className="wishlist-item__price">{formatPrice(p.price)}</span>
+                      {p.price_old && <span className="wishlist-item__price-old">{formatPrice(p.price_old)}</span>}
+                      {disc && <span className="wishlist-item__discount-badge">-{disc}%</span>}
+                    </div>
+                    <div
+                      className={`wishlist-item__notify${item.notify_price_drop ? ' on' : ''}`}
+                      onClick={() => toggleNotify(item)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {item.notify_price_drop
+                        ? <><Bell size={11} /> Уведомить о скидке</>
+                        : <><BellOff size={11} /> Без уведомлений</>
+                      }
+                    </div>
+                  </div>
+                  <button className="wishlist-remove-btn" onClick={() => removeItem(item.id)}>
+                    <Trash2 size={13} />
+                  </button>
+                  <button className="wishlist-buy-btn">
+                    <ExternalLink size={12} />
+                    Купить
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+
+          {filtered.length > 0 && (
+            <div className="wishlist-footer">
+              <button className="btn-primary">Перейти к покупкам</button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

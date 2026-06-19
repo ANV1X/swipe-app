@@ -1,139 +1,118 @@
-import { useState } from 'react'
-import { Plus, ChevronRight, ArrowLeft } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowLeft, Plus, Shirt, Footprints, Watch, Layers } from 'lucide-react'
+import { supabase, Product, getAnonId } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '../components/Toast'
 
-const CAPSULE_ITEMS = [
-  { id: 1, image: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=300', cat: 'Верх' },
-  { id: 2, image: 'https://images.pexels.com/photos/1183266/pexels-photo-1183266.jpeg?auto=compress&cs=tinysrgb&w=300', cat: 'Верх' },
-  { id: 3, image: 'https://images.pexels.com/photos/1598505/pexels-photo-1598505.jpeg?auto=compress&cs=tinysrgb&w=300', cat: 'Низ' },
-  { id: 4, image: 'https://images.pexels.com/photos/1040945/pexels-photo-1040945.jpeg?auto=compress&cs=tinysrgb&w=300', cat: 'Низ' },
-  { id: 5, image: 'https://images.pexels.com/photos/2529148/pexels-photo-2529148.jpeg?auto=compress&cs=tinysrgb&w=300', cat: 'Обувь' },
-]
+function formatPrice(p: number) {
+  return p.toLocaleString('ru-RU') + ' ₽'
+}
 
-const CATEGORIES = [
-  { name: 'Верх', current: 4, max: 5 },
-  { name: 'Низ', current: 3, max: 4 },
-  { name: 'Обувь', current: 2, max: 3 },
-  { name: 'Верхняя одежда', current: 1, max: 2 },
-]
-
-const ADD_ITEMS = [
-  { label: 'Белые кеды', note: 'добавить в капсулу' },
-  { label: 'Бежевый тренч', note: 'добавить в капсулу' },
-  { label: 'Чёрные брюки', note: 'добавить в капсулу' },
+const CAPSULE_CATS = [
+  { key: 'Верх', icon: Shirt, target: 5, current: 4 },
+  { key: 'Низ', icon: Layers, target: 4, current: 3 },
+  { key: 'Обувь', icon: Footprints, target: 3, current: 2 },
+  { key: 'Верхняя одежда', icon: Shirt, target: 2, current: 1 },
 ]
 
 export default function CapsulePage() {
+  const [items, setItems] = useState<Product[]>([])
   const navigate = useNavigate()
-  const [addedItems, setAddedItems] = useState<Set<number>>(new Set())
+  const { show, node } = useToast()
 
-  const totalItems = CATEGORIES.reduce((s, c) => s + c.current, 0)
-  const totalMax = CATEGORIES.reduce((s, c) => s + c.max, 0)
-  const progress = Math.round((totalItems / totalMax) * 100)
+  useEffect(() => {
+    const userId = getAnonId()
+    supabase
+      .from('wishlist')
+      .select('*, products(*)')
+      .eq('user_id', userId)
+      .limit(8)
+      .then(({ data }) => {
+        setItems((data || []).map((d: any) => d.products).filter(Boolean))
+      })
+  }, [])
 
-  function toggleAdd(idx: number) {
-    setAddedItems(prev => {
-      const next = new Set(prev)
-      next.has(idx) ? next.delete(idx) : next.add(idx)
-      return next
-    })
-  }
+  const total = CAPSULE_CATS.reduce((sum, c) => sum + c.current, 0)
+  const totalTarget = CAPSULE_CATS.reduce((sum, c) => sum + c.target, 0)
+  const progress = Math.round((total / totalTarget) * 100)
+  const combos = Math.max(total * 3, 38)
 
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100%' }}>
+    <div className="page-bg">
+      {node}
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => navigate(-1)} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text)', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-            <ArrowLeft size={18} />
-          </button>
-          <span className="page-title">Моя капсула</span>
-        </div>
+        <button className="back-btn" onClick={() => navigate(-1)}><ArrowLeft size={18} /></button>
+        <div style={{ flex: 1, textAlign: 'center', fontSize: 17, fontWeight: 700 }}>Моя капсула</div>
+        <div style={{ width: 36 }} />
       </div>
 
-      {/* Progress */}
-      <div className="cap-card" style={{ margin: '0 16px 12px' }}>
-        <div className="cap-section-label">Прогресс</div>
-        <div className="cap-progress-bar">
-          <div className="cap-progress-fill" style={{ width: `${progress}%` }} />
+      <div style={{ padding: '0 16px 16px' }}>
+        {/* Progress */}
+        <div className="capsule-progress-card">
+          <div className="capsule-progress-label">Прогресс</div>
+          <div className="capsule-progress-bar">
+            <div className="capsule-progress-fill" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="capsule-progress-pct">{progress}%</div>
         </div>
-        <div className="cap-progress-pct">{progress}%</div>
 
         {/* Category rows */}
-        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {CATEGORIES.map(cat => (
-            <div key={cat.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{cat.name}</span>
-              <span style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 500 }}>
-                <span style={{ fontWeight: 700, color: 'var(--text)' }}>{cat.current}</span> / {cat.max}
-              </span>
-            </div>
-          ))}
+        <div className="capsule-rows">
+          {CAPSULE_CATS.map(cat => {
+            const Icon = cat.icon
+            return (
+              <div key={cat.key} className="capsule-row">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon size={14} color="var(--accent)" />
+                  </div>
+                  <span className="capsule-row__label">{cat.key}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="capsule-row__fraction">{cat.current} / {cat.target}</span>
+                </div>
+              </div>
+            )
+          })}
         </div>
-      </div>
 
-      {/* Combinations */}
-      <div className="cap-card" style={{ margin: '0 16px 12px' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-          <div className="cap-section-label">Потенциально:</div>
-          <span style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>+12 новых сочетаний</span>
+        {/* Combos stat */}
+        <div className="capsule-stat-row">
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Потенциально:</div>
+          <div className="capsule-stat-number">{combos} <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text2)' }}>образов</span></div>
         </div>
-        <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>38 образов</div>
 
-        {/* Mini scrollable images */}
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 4 }}>
-          {CAPSULE_ITEMS.map(item => (
-            <img
-              key={item.id}
-              src={item.image}
-              style={{ width: 60, height: 76, borderRadius: 10, objectFit: 'cover', flexShrink: 0, background: 'var(--surface2)' }}
-              alt={item.cat}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Add items */}
-      <div className="cap-card" style={{ margin: '0 16px 12px' }}>
-        <div className="cap-section-label" style={{ marginBottom: 12 }}>Добавить:</div>
-        {ADD_ITEMS.map((item, idx) => (
-          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 12, marginBottom: 12, borderBottom: idx < ADD_ITEMS.length - 1 ? '1px solid var(--border)' : 'none' }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--border)', flexShrink: 0, marginLeft: 4 }} />
-            <span style={{ flex: 1, fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{item.label}</span>
-            <button
-              onClick={() => toggleAdd(idx)}
-              style={{
-                width: 28, height: 28, borderRadius: '50%',
-                border: '1.5px solid var(--border)',
-                background: addedItems.has(idx) ? 'var(--accent)' : 'none',
-                color: addedItems.has(idx) ? '#fff' : 'var(--text2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', flexShrink: 0,
-              }}
-            >
-              {addedItems.has(idx)
-                ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                : <Plus size={14} />
-              }
-            </button>
+        {/* Mini images */}
+        {items.length > 0 && (
+          <div className="capsule-mini-imgs" style={{ marginTop: 12 }}>
+            {items.map(p => (
+              <img key={p.id} className="capsule-mini-img" src={p.image_url || ''} alt={p.title} />
+            ))}
           </div>
-        ))}
-      </div>
+        )}
 
-      {/* Recommendations */}
-      <div className="cap-card" style={{ margin: '0 16px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div className="cap-section-label" style={{ marginBottom: 0 }}>Рекомендуем</div>
-          <button style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
-            Все <ChevronRight size={14} />
-          </button>
-        </div>
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
-          {CAPSULE_ITEMS.slice(0, 3).map(item => (
-            <div key={item.id} style={{ flexShrink: 0, width: 90, cursor: 'pointer' }}>
-              <img src={item.image} style={{ width: 90, height: 110, borderRadius: 12, objectFit: 'cover', background: 'var(--surface2)' }} alt="" />
-              <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>{item.cat}</div>
-            </div>
-          ))}
+        {/* Add items */}
+        <div className="capsule-add-section">
+          <div className="capsule-add-title">Добавить:</div>
+          {[
+            { label: 'Белые кеды', icon: Footprints },
+            { label: 'Бежевый тренч', icon: Shirt },
+            { label: 'Чёрные брюки', icon: Layers },
+          ].map(item => {
+            const Icon = item.icon
+            return (
+              <div key={item.label} className="capsule-add-item" onClick={() => show(`${item.label} добавлено в список желаний`)}>
+                <div className="capsule-add-icon">
+                  <Icon size={14} />
+                </div>
+                <span className="capsule-add-label">{item.label}</span>
+                <button className="capsule-add-plus">+</button>
+              </div>
+            )
+          })}
+          <div style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600, padding: '10px 0 0', cursor: 'pointer' }}>
+            +12 новых сочетаний →
+          </div>
         </div>
       </div>
     </div>

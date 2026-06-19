@@ -1,101 +1,127 @@
-import { useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowLeft, Sparkles } from 'lucide-react'
+import { supabase, Product } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '../components/Toast'
 
 const COLORS = [
-  { name: 'Чёрный', hex: '#1A1A1A' },
-  { name: 'Белый', hex: '#F5F5F5', border: true },
-  { name: 'Бежевый', hex: '#C9B89A' },
-  { name: 'Хаки', hex: '#8B8B6B' },
+  { name: 'Чёрный', color: '#1C1C1E' },
+  { name: 'Белый', color: '#F5F5F0', border: true },
+  { name: 'Бежевый', color: '#D4C4A8' },
+  { name: 'Хаки', color: '#8B8560' },
+  { name: 'Синий', color: '#2C5F8A' },
 ]
 
 const STYLES = ['Oversize', 'Minimal', 'Casual', 'Smart']
 
-const RECS = [
-  { id: 1, name: 'Тренч бежевый', price: '6 490 ₽', image: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=400' },
-  { id: 2, name: 'Кроссовки белые', price: '4 990 ₽', image: 'https://images.pexels.com/photos/2529148/pexels-photo-2529148.jpeg?auto=compress&cs=tinysrgb&w=400' },
-  { id: 3, name: 'Джинсы прямые', price: '3 990 ₽', image: 'https://images.pexels.com/photos/1598505/pexels-photo-1598505.jpeg?auto=compress&cs=tinysrgb&w=400' },
-  { id: 4, name: 'Пальто серое', price: '9 990 ₽', image: 'https://images.pexels.com/photos/1040945/pexels-photo-1040945.jpeg?auto=compress&cs=tinysrgb&w=400' },
-]
+function formatPrice(p: number) {
+  return p.toLocaleString('ru-RU') + ' ₽'
+}
 
 export default function ForYouPage() {
+  const [products, setProducts] = useState<Product[]>([])
+  const [activeStyles, setActiveStyles] = useState<Set<string>>(new Set(['Minimal']))
+  const [activeColors, setActiveColors] = useState<Set<string>>(new Set(['Чёрный', 'Бежевый']))
   const navigate = useNavigate()
-  const [activeStyle, setActiveStyle] = useState('Minimal')
+  const { show, node } = useToast()
+
+  useEffect(() => {
+    supabase.from('products').select('*').order('created_at', { ascending: false }).limit(6)
+      .then(({ data }) => setProducts(data || []))
+  }, [])
+
+  function toggleStyle(s: string) {
+    setActiveStyles(prev => {
+      const n = new Set(prev)
+      if (n.has(s)) n.delete(s); else n.add(s)
+      return n
+    })
+    show('Предпочтения обновлены')
+  }
+
+  function toggleColor(name: string) {
+    setActiveColors(prev => {
+      const n = new Set(prev)
+      if (n.has(name)) n.delete(name); else n.add(name)
+      return n
+    })
+  }
+
+  const matchCount = 32
+  const matchPct = 96
 
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100%' }}>
+    <div className="page-bg">
+      {node}
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => navigate(-1)} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text)', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-            <ArrowLeft size={18} />
-          </button>
-          <span className="page-title">Для тебя ✨</span>
+        <button className="back-btn" onClick={() => navigate(-1)}><ArrowLeft size={18} /></button>
+        <div style={{ flex: 1, textAlign: 'center', fontSize: 17, fontWeight: 700 }}>Для тебя ✨</div>
+        <div style={{ width: 36 }} />
+      </div>
+
+      <div style={{ padding: '2px 0 0' }}>
+        <div style={{ fontSize: 13, color: 'var(--text2)', padding: '0 20px 12px' }}>
+          Мы изучили твой вкус
         </div>
       </div>
 
-      <div style={{ padding: '0 16px 4px', fontSize: 13, color: 'var(--text2)', marginBottom: 2 }}>
-        Мы изучили твой вкус
-      </div>
-
-      {/* Favourite colors */}
-      <div className="cap-card" style={{ margin: '0 16px 12px' }}>
-        <div className="cap-section-label" style={{ marginBottom: 12 }}>Любимые цвета</div>
-        <div style={{ display: 'flex', gap: 16 }}>
+      {/* Colors */}
+      <div className="foryou-section">
+        <div className="foryou-section-label">Любимые цвета</div>
+        <div className="foryou-colors-row">
           {COLORS.map(c => (
-            <div key={c.name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: '50%', background: c.hex,
-                border: c.border ? '1.5px solid var(--border)' : '1.5px solid transparent',
-              }} />
-              <span style={{ fontSize: 10, color: 'var(--text2)', fontWeight: 500 }}>{c.name}</span>
+            <div key={c.name} className="foryou-color-item" onClick={() => toggleColor(c.name)}>
+              <div
+                className="foryou-color-swatch"
+                style={{
+                  background: c.color,
+                  borderColor: activeColors.has(c.name) ? 'var(--accent)' : 'rgba(0,0,0,0.08)',
+                  borderWidth: activeColors.has(c.name) ? 3 : 2,
+                  transform: activeColors.has(c.name) ? 'scale(1.08)' : 'scale(1)',
+                  transition: 'all 0.15s'
+                }}
+              />
+              <div className="foryou-color-name">{c.name}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Style preference */}
-      <div className="cap-card" style={{ margin: '0 16px 12px' }}>
-        <div className="cap-section-label" style={{ marginBottom: 12 }}>Стиль</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {/* Styles */}
+      <div className="foryou-section">
+        <div className="foryou-section-label">Стиль</div>
+        <div className="foryou-styles-row">
           {STYLES.map(s => (
             <button
               key={s}
-              onClick={() => setActiveStyle(s)}
-              className={`filter-chip${activeStyle === s ? ' active' : ''}`}
-              style={{ padding: '6px 14px', fontSize: 12 }}
+              className={`foryou-style-chip${activeStyles.has(s) ? ' active' : ''}`}
+              onClick={() => toggleStyle(s)}
             >{s}</button>
           ))}
         </div>
       </div>
 
-      {/* Подборка / Match */}
-      <div className="cap-card" style={{ margin: '0 16px 12px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <div>
-            <div className="cap-section-label" style={{ marginBottom: 4 }}>Подборка сегодня</div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>32 новых товара</div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 2 }}>Совпадение вкуса</div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--accent)' }}>96%</div>
-          </div>
+      {/* Match */}
+      <div className="foryou-match-card">
+        <div className="foryou-match-left">
+          <div className="foryou-match-title">Подборка сегодня</div>
+          <div className="foryou-match-count">{matchCount} новых товара</div>
+          <div className="foryou-match-sub">Совпадение вкуса</div>
         </div>
+        <div className="foryou-match-pct">{matchPct}%</div>
       </div>
 
-      {/* Recommendations grid */}
-      <div style={{ padding: '0 16px 24px' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Рекомендуем</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {RECS.map(rec => (
-            <div key={rec.id} style={{ background: 'var(--surface)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer' }}>
-              <img
-                src={rec.image}
-                style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block', background: 'var(--surface2)' }}
-                alt={rec.name}
-              />
-              <div style={{ padding: '8px 10px 10px' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{rec.name}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{rec.price}</div>
+      {/* Recommendations */}
+      <div className="foryou-recs-section">
+        <div className="foryou-recs-title">Рекомендуем</div>
+        <div className="foryou-recs-grid">
+          {products.map(p => (
+            <div key={p.id} className="foryou-rec-card">
+              <img src={p.image_url || ''} alt={p.title} />
+              <div className="foryou-rec-info">
+                <div className="foryou-rec-brand">{p.brand || p.marketplace}</div>
+                <div className="foryou-rec-name">{p.title}</div>
+                <div className="foryou-rec-price">{formatPrice(p.price)}</div>
               </div>
             </div>
           ))}

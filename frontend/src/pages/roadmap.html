@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SWIPE FASHION · МЕГА-РОАДМАП · 8 страниц (МАКСИМУМ+)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600;14..32,700;14..32,800;14..32,900&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js">
+    </script>
+    <style>
+        :root {
+            --bg: #0a0a0c;
+            --surface: #121217;
+            --surface-2: #1a1a22;
+            --surface-3: #25252f;
+            --border: rgba(255, 255, 255, 0.05);
+            --text: #eeecf0;
+            --text-muted: #88869b;
+            --purple: #8b5cf6;
+            --pink: #ec4899;
+            --teal: #14b8a6;
+            --amber: #f59e0b;
+            --cyan: #06b6d4;
+            --red: #ef4444;
+            --green: #22c55e;
+            --grad-1: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+            --grad-2: linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%);
+            --grad-3: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+            --radius: 18px;
+            --shadow: 0 8px 48px rgba(139, 92, 246, 0.08);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 18px 22px 60px;
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--surface);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--purple);
+            border-radius: 12px;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 14px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .logo-icon {
+            font-size: 34px;
+            filter: drop-shadow(0 0 20px rgba(139, 92, 246, 0.25));
+        }
+        .logo-text {
+            font-size: 28px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            background: var(--grad-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .logo-text span {
+            font-weight: 400;
+            -webkit-text-fill-color: var(--text-muted);
+            background: none;
+        }
+        .header-badge {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        .header-badge .num {
+            color: #fff;
+            background: var(--purple);
+            padding: 0 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            line-height: 22px;
+            margin-left: 4px;
+        }
+        .nav-scroll {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            scrollbar-width: none;
+            padding-bottom: 6px;
+        }
+        .nav-scroll::-webkit-scrollbar {
+            display: none;
+        }
+        .tab-btn {
+            flex-shrink: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 9px 18px;
+            border-radius: 40px;
+            font-weight: 700;
+            font-size: 12px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: 0.25s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        .tab-btn:hover {
+            background: var(--surface-2);
+            color: #fff;
+        }
+        .tab-btn.active {
+            background: var(--grad-1);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 4px 24px rgba(139, 92, 246, 0.3);
+        }
+        .tab-btn .emoji {
+            font-size: 15px;
+        }
+        .page {
+            display: none;
+            animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .page.active {
+            display: block;
+        }
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .page-title {
+            font-size: 30px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+        .page-title .emoji {
+            font-size: 32px;
+        }
+        .page-sub {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 22px;
+            font-weight: 400;
+        }
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            margin: 26px 0 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .grid-5 {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            transition: 0.2s ease;
+        }
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.07);
+            box-shadow: var(--shadow);
+        }
+        .card-glow-purple {
+            border-left: 4px solid var(--purple);
+        }
+        .card-glow-pink {
+            border-left: 4px solid var(--pink);
+        }
+        .card-glow-teal {
+            border-left: 4px solid var(--teal);
+        }
+        .card-glow-amber {
+            border-left: 4px solid var(--amber);
+        }
+        .card-glow-cyan {
+            border-left: 4px solid var(--cyan);
+        }
+        .card-title {
+            font-weight: 700;
+            font-size: 15px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-title .emoji {
+            font-size: 17px;
+        }
+        .card-text {
+            font-size: 12.5px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+        .card-text strong {
+            color: #fff;
+            font-weight: 600;
+        }
+        .stat-card {
+            background: var(--surface-2);
+            border-radius: 14px;
+            padding: 12px 14px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        .stat-card .number {
+            font-size: 28px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            line-height: 1.1;
+        }
+        .stat-card .number.purple {
+            color: var(--purple);
+        }
+        .stat-card .number.pink {
+            color: var(--pink);
+        }
+        .stat-card .number.teal {
+            color: var(--teal);
+        }
+        .stat-card .number.amber {
+            color: var(--amber);
+        }
+        .stat-card .number.cyan {
+            color: var(--cyan);
+        }
+        .stat-card .number.green {
+            color: var(--green);
+        }
+        .stat-card .number.red {
+            color: var(--red);
+        }
+        .stat-card .label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 3px;
+            font-weight: 500;
+        }
+        .stat-card .sub {
+            font-size: 10px;
+            color: var(--text-muted);
+            opacity: 0.5;
+            margin-top: 2px;
+        }
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            margin: 8px 0 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            min-width: 650px;
+        }
+        thead th {
+            background: var(--surface-2);
+            color: var(--text-muted);
+            font-weight: 700;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        tbody td {
+            padding: 7px 10px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        tbody tr:hover {
+            background: rgba(255, 255, 255, 0.015);
+        }
+        .td-highlight {
+            background: rgba(139, 92, 246, 0.06);
+        }
+        .td-purple {
+            color: var(--purple);
+            font-weight: 700;
+        }
+        .td-teal {
+            color: var(--teal);
+            font-weight: 700;
+        }
+        .td-pink {
+            color: var(--pink);
+            font-weight: 700;
+        }
+        .td-amber {
+            color: var(--amber);
+            font-weight: 700;
+        }
+        .td-red {
+            color: var(--red);
+            font-weight: 700;
+        }
+        .td-green {
+            color: var(--green);
+            font-weight: 700;
+        }
+        .td-muted {
+            color: var(--text-muted);
+        }
+        .tag {
+            display: inline-block;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding: 1px 10px;
+            border-radius: 20px;
+            background: rgba(139, 92, 246, 0.12);
+            color: var(--purple);
+            border: 1px solid rgba(139, 92, 246, 0.1);
+        }
+        .tag.teal {
+            background: rgba(20, 184, 166, 0.12);
+            color: var(--teal);
+        }
+        .tag.pink {
+            background: rgba(236, 72, 153, 0.12);
+            color: var(--pink);
+        }
+        .tag.amber {
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--amber);
+        }
+        .tag.red {
+            background: rgba(239, 68, 68, 0.12);
+            color: var(--red);
+        }
+        .tag.green {
+            background: rgba(34, 197, 94, 0.12);
+            color: var(--green);
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 200px;
+            width: 100%;
+            margin-top: 4px;
+        }
+        .chart-wrapper.tall {
+            height: 250px;
+        }
+        .scenario-card {
+            border-radius: var(--radius);
+            padding: 16px 18px;
+            border: 1px solid var(--border);
+            background: var(--surface-2);
+            text-align: center;
+            transition: 0.2s;
+        }
+        .scenario-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        .scenario-card .scenario-name {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+        .scenario-card .scenario-name.realistic {
+            color: var(--teal);
+        }
+        .scenario-card .scenario-name.optimistic {
+            color: var(--purple);
+        }
+        .scenario-card .scenario-name.cosmic {
+            color: var(--amber);
+        }
+        .scenario-card .scenario-mau {
+            font-size: 34px;
+            font-weight: 900;
+            margin: 4px 0;
+        }
+        .scenario-card .scenario-rev {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+        .scenario-card .scenario-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+            line-height: 1.5;
+        }
+        .swot-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 6px;
+        }
+        .swot-item {
+            background: var(--surface-2);
+            border-radius: 12px;
+            padding: 10px 14px;
+            border-left: 4px solid var(--purple);
+        }
+        .swot-item .swot-title {
+            font-weight: 700;
+            font-size: 12px;
+            margin-bottom: 3px;
+        }
+        .swot-item .swot-text {
+            font-size: 11.5px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+        .swot-item.strength {
+            border-left-color: var(--teal);
+        }
+        .swot-item.weakness {
+            border-left-color: var(--red);
+        }
+        .swot-item.opportunity {
+            border-left-color: var(--purple);
+        }
+        .swot-item.threat {
+            border-left-color: var(--amber);
+        }
+        .post-example {
+            background: var(--surface-2);
+            border-radius: 14px;
+            padding: 14px 18px;
+            border-left: 4px solid var(--pink);
+            margin-bottom: 12px;
+        }
+        .post-example .post-time {
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--amber);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .post-example .post-time .rubric {
+            color: var(--text-muted);
+            font-weight: 400;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        .post-example .post-body {
+            font-size: 13px;
+            color: var(--text);
+            margin-top: 6px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            border: 1px dashed var(--border);
+            line-height: 1.6;
+        }
+        .post-example .post-body .emoji-big {
+            font-size: 18px;
+        }
+        .post-example .post-cta {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--teal);
+            font-weight: 600;
+        }
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 20px 0 16px;
+        }
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        @media (max-width: 1024px) {
+            .grid-4 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .grid-5 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        @media (max-width: 820px) {
+            body {
+                padding: 12px;
+            }
+            .grid-2,
+            .grid-3 {
+                grid-template-columns: 1fr;
+            }
+            .grid-4 {
+                grid-template-columns: 1fr 1fr;
+            }
+            .grid-5 {
+                grid-template-columns: 1fr 1fr;
+            }
+            .logo-text {
+                font-size: 20px;
+            }
+            .page-title {
+                font-size: 22px;
+            }
+            .swot-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 500px) {
+            .grid-4,
+            .grid-5 {
+                grid-template-columns: 1fr;
+            }
+            .tab-btn {
+                font-size: 10px;
+                padding: 6px 12px;
+            }
+            .card {
+                padding: 12px;
+            }
+            .stat-card .number {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <span class="logo-icon">👟</span>
+            <span class="logo-text">SWIPE<span>FASHION</span></span>
+        </div>
+        <div class="header-badge">
+            📍 СТРАНИЦА <span class="num" id="pageIndicator">1</span> / 8
+        </div>
+    </header>
+    <div class="nav-scroll">
+        <button class="tab-btn active" onclick="goPage(1)"><span class="emoji">⚡</span> Разработка</button>
+        <button class="tab-btn" onclick="goPage(2)"><span class="emoji">🚀</span> Маркетинг</button>
+        <button class="tab-btn" onclick="goPage(3)"><span class="emoji">📈</span> Юзеры</button>
+        <button class="tab-btn" onclick="goPage(4)"><span class="emoji">💰</span> Финансы</button>
+        <button class="tab-btn" onclick="goPage(5)"><span class="emoji">🎯</span> Контент</button>
+        <button class="tab-btn" onclick="goPage(6)"><span class="emoji">🧠</span> Стратегия</button>
+        <button class="tab-btn" onclick="goPage(7)"><span class="emoji">🏛️</span> Аналитика</button>
+        <button class="tab-btn" onclick="goPage(8)"><span class="emoji">🏁</span> B2B &amp; KPI</button>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PAGE 1 — РАЗРАБОТКА (добавлен QA-план)                       -->
+    <!-- ============================================================ -->
+    <div class="page active" id="page1">
+        <div class="page-title"><span class="emoji">⚡</span> Техническая архитектура</div>
+        <div class="page-sub">24 спринта · FastAPI + PostgreSQL + Redis · 8000 RPS · CI/CD · Мониторинг · QA</div>
+        <div class="grid-5">
+            <div class="stat-card"><div class="number purple">24</div><div class="label">Спринтов</div><div class="sub">по 15 дней</div></div>
+            <div class="stat-card"><div class="number teal">12</div><div class="label">Месяцев</div><div class="sub">полный цикл</div></div>
+            <div class="stat-card"><div class="number pink">~112K</div><div class="label">Строк кода</div></div>
+            <div class="stat-card"><div class="number amber">8 000</div><div class="label">RPS пик</div></div>
+            <div class="stat-card"><div class="number cyan">99.95%</div><div class="label">SLA</div></div>
+        </div>
+        <div class="grid-2">
+            <div class="card card-glow-purple"><div class="card-title">🧬 Тех-стек</div><div style="font-size:11.5px;color:var(--text-muted);line-height:1.8;">Python 3.11.6 · FastAPI 0.104.1 · SQLAlchemy 2.0.23 · asyncpg 0.29.0 · Redis 7.2.3 · Celery 5.3.4 · gRPC 1.59.0 · Docker 24.0.7 · Prometheus 2.48.0 · Grafana 10.2.2 · ELK 8.10</div></div>
+            <div class="card card-glow-teal"><div class="card-title">🗄️ Схема БД</div><div style="font-size:11px;color:var(--text-muted);line-height:1.8;">users, items, swipes, battles, transactions, brands, campaigns, analytics_events · 12 составных индексов · Партиционирование по месяцам · Репликация master-slave</div></div>
+        </div>
+        <div class="card card-glow-cyan"><div class="card-title">🔄 CI/CD &amp; Документация</div><div style="font-size:11.5px;color:var(--text-muted);line-height:1.8;">• GitHub Actions (автотесты, линтинг, сборка) · • ArgoCD для деплоя · • Swagger/OpenAPI · • Документация в Notion · • C4 model диаграммы</div></div>
+        <div class="card card-glow-pink"><div class="card-title">🔒 Безопасность</div><div style="font-size:11.5px;color:var(--text-muted);line-height:1.8;">• HMAC-SHA256 · • JWT · • Rate-limiting · • Snyk сканирование · • 2FA для админки</div></div>
+        <div class="card card-glow-amber"><div class="card-title">📋 Бэкапы и миграции</div><div style="font-size:11.5px;color:var(--text-muted);line-height:1.8;">• pg_dump + WAL ежедневно · • Репликация failover · • Тестирование восстановления · • S3 шифрование · • Retention 30 дней / 1 год</div></div>
+        <div class="card card-glow-purple"><div class="card-title">🖥️ Админ-панель</div><div style="font-size:11.5px;color:var(--text-muted);line-height:1.8;">• Управление пользователями · • Модерация контента · • Управление батлами · • Статистика в реальном времени · • Бюджет 20 000 ₽</div></div>
+        <div class="card card-glow-cyan"><div class="card-title">📊 Мониторинг ошибок (Sentry)</div><div style="font-size:11.5px;color:var(--text-muted);line-height:1.8;">• Интеграция Sentry · • Алерты в Telegram · • Автосоздание задач в GitHub · • Еженедельный отчёт по ошибкам</div></div>
+        <div class="card card-glow-teal"><div class="card-title">🧪 План по обеспечению качества (QA)</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2;">• <strong style="color:#fff;">Автоматизированное тестирование:</strong> Selenium для E2E-сценариев (регистрация, свайп, батл) — внедрение в спринте 10.<br />• <strong style="color:#fff;">Регрессионные сценарии:</strong> 30 ключевых пользовательских путей, запуск после каждого спринта.<br />• <strong style="color:#fff;">Нагрузочное тестирование:</strong> Locust (уже в спринте 12) с профилированием.<br />• <strong style="color:#fff;">Ручное тестирование:</strong> выделенный тестировщик на 0.5 ставки (15 000 ₽/мес) с М4.<br />• <strong style="color:#fff;">CI/CD интеграция:</strong> автотесты запускаются при каждом PR в main.</div></div>
+        <div class="section-label">🧩 Спринты (1–24) — сокращённо</div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Спринт</th><th>Задачи</th><th>Дни</th><th>Бюджет (₽)</th></tr></thead>
+                <tbody>
+                    <tr><td>1</td><td>FastAPI, Alembic, asyncpg, таблицы</td><td>1-15</td><td>3 000</td></tr>
+                    <tr><td>2</td><td>aiogram webhook, HMAC-SHA256, Loguru</td><td>16-30</td><td>3 000</td></tr>
+                    <tr><td>3</td><td>Celery Beat, проверка сторис</td><td>31-45</td><td>5 000</td></tr>
+                    <tr><td>4</td><td>PvP-движок, battles, is_premium</td><td>46-60</td><td>5 000</td></tr>
+                    <tr><td>5-6</td><td>JWT для брендов, загрузка CSV/JSON</td><td>61-90</td><td>8 000</td></tr>
+                    <tr><td>7-8</td><td>SQL-агрегаты CTR, JSON-отчёты</td><td>91-120</td><td>8 000</td></tr>
+                    <tr><td>9-10</td><td>Redis ZSET, Style-DNA (NumPy)</td><td>121-150</td><td>16 000</td></tr>
+                    <tr><td>11-12</td><td>Оптимизация, нагрузочное тестирование</td><td>151-180</td><td>16 000</td></tr>
+                    <tr><td>13-14</td><td>Шардирование, кэширование (Redis Cluster)</td><td>181-210</td><td>16 000</td></tr>
+                    <tr><td>15-16</td><td>Админ-панель, Sentry, QA-инфраструктура</td><td>211-240</td><td>28 000</td></tr>
+                    <tr><td>17-20</td><td>Микросервисы (auth, swipe, billing, analytics)</td><td>241-300</td><td>48 000</td></tr>
+                    <tr><td>21-24</td><td>gRPC, Docker, Real-Time Bidding, финал</td><td>301-360</td><td>48 000</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card card-glow-purple"><div class="card-title">📊 ИТ-бюджет сводка</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:12px;color:var(--text-muted);"><div><strong>М1-2</strong> 6 000 ₽</div><div><strong>М3-4</strong> 10 000 ₽</div><div><strong>М5-8</strong> 16 000 ₽</div><div><strong>М9-12</strong> 140 000 ₽ (вкл. QA)</div><div><strong>Итого</strong> 172 000 ₽</div></div></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PAGE 2 — МАРКЕТИНГ (+ работа с отзывами)                     -->
+    <!-- ============================================================ -->
+    <div class="page" id="page2">
+        <div class="page-title"><span class="emoji">🚀</span> Маркетинг &amp; 3 сценария</div>
+        <div class="page-sub">GTM-стратегия · TG Ads · Сезонность · Инфлюенсеры · PR · Отзывы и репутация</div>
+        <div class="grid-3">
+            <div class="scenario-card"><div class="scenario-name realistic">📊 Реалистичный</div><div class="scenario-mau" style="color:var(--teal);">132 000</div><div class="scenario-rev">Выручка М12: 650 000 ₽</div><span class="tag teal">Базовый</span></div>
+            <div class="scenario-card"><div class="scenario-name optimistic">🚀 Оптимистичный</div><div class="scenario-mau" style="color:var(--purple);">210 000</div><div class="scenario-rev">Выручка М12: 1 150 000 ₽</div><span class="tag">Целевой</span></div>
+            <div class="scenario-card"><div class="scenario-name cosmic">🌌 Космический</div><div class="scenario-mau" style="color:var(--amber);">380 000</div><div class="scenario-rev">Выручка М12: 2 400 000 ₽</div><span class="tag amber">Мечта</span></div>
+        </div>
+        <div class="card card-glow-amber"><div class="card-title">📊 Сравнительный рост MAU</div><div class="chart-wrapper tall"><canvas id="scenarioChart"></canvas></div></div>
+        <div class="grid-2">
+            <div class="card card-glow-purple"><div class="card-title">📋 Ключевые параметры (М12)</div><div class="table-wrap" style="margin:6px 0 0;"><table><thead><tr><th>Параметр</th><th>Реал.</th><th>Опт.</th><th>Косм.</th></tr></thead><tbody><tr><td>MAU</td><td class="td-teal">132K</td><td class="td-purple">210K</td><td class="td-amber">380K</td></tr><tr><td>DAU</td><td>26.4K</td><td>42K</td><td>76K</td></tr><tr><td>K‑factor</td><td>1.8</td><td>2.5</td><td>4.0</td></tr><tr><td>Premium CR</td><td>2.1%</td><td>3.5%</td><td>5.0%</td></tr><tr><td>LTV</td><td>420 ₽</td><td>580 ₽</td><td>820 ₽</td></tr><tr><td>CAC</td><td>90 ₽</td><td>85 ₽</td><td>70 ₽</td></tr><tr><td>LTV/CAC</td><td>4.7x</td><td>6.8x</td><td>11.7x</td></tr></tbody></table></div></div>
+            <div class="card card-glow-teal"><div class="card-title">📌 Детали TG Ads</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2;">• Гео: РФ, СНГ · Интересы: Fashion · Исключения: Premium · CPC ~ 12 ₽ · CTR ~ 8% · Бюджет: 65% от прибыли → реинвест</div></div>
+        </div>
+        <div class="card card-glow-pink"><div class="card-title">📅 Сезонный календарь и креативная стратегия</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2;">• Q1: «Новый гардероб» · Q2: «Свадебный стиль» · Q3: «Отпускной лук» · Q4: «Back to school/office» · Ретаргетинг через 24 часа.</div></div>
+        <div class="card card-glow-cyan"><div class="card-title">🌟 Инфлюенсеры и PR</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2;">• Бюджет 50 000 ₽ на 10 инфлюенсеров · Бартер: Premium + Stars · PR: публикации в vc.ru, Rusbase (30 000 ₽), подкасты.</div></div>
+        <div class="card card-glow-purple"><div class="card-title">💬 Стратегия работы с отзывами и репутацией</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2;">• <strong style="color:#fff;">Мониторинг отзывов:</strong> ежедневная проверка комментариев в канале и TG-чатах (через сервис мониторинга, например, Brand24) — бюджет 3 000 ₽/мес.<br />• <strong style="color:#fff;">Реагирование на негатив:</strong> ответ < 2 часов, предложение бонуса (50 Stars) за повторную попытку.<br />• <strong style="color:#fff;">Публикация положительных отзывов:</strong> еженедельный пост с лучшими отзывами (с согласия пользователей).<br />• <strong style="color:#fff;">Анализ тональности:</strong> ежемесячный отчёт по NPS и ключевым жалобам (сводка для команды).</div></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PAGE 3 — ЮЗЕРЫ (+ A/B-тесты онбординга)                      -->
+    <!-- ============================================================ -->
+    <div class="page" id="page3">
+        <div class="page-title"><span class="emoji">📈</span> Пользователи — Реалистичный сценарий</div>
+        <div class="page-sub">MAU, DAU, Retention, Churn, ARPU, LTV, когортный анализ, реферальная программа, A/B-тесты онбординга</div>
+        <div class="card card-glow-teal"><div class="card-title">📊 Реалистичный</div><div class="table-wrap"><table><thead><tr><th>Месяц</th><th>MAU</th><th>DAU</th><th>Новые</th><th>Ret D30</th><th>Churn</th><th>ARPU</th><th>LTV</th></tr></thead><tbody><tr><td>М1</td><td>2 400</td><td>480</td><td>+3 500</td><td>—</td><td>15%</td><td>0 ₽</td><td>—</td></tr><tr><td>М2</td><td>6 300</td><td>1 260</td><td>+6 000</td><td>—</td><td>12%</td><td>5.2 ₽</td><td>—</td></tr><tr><td>М3</td><td>13 500</td><td>2 700</td><td>+11 000</td><td>15%</td><td>10%</td><td>7.8 ₽</td><td>180 ₽</td></tr><tr><td>М4</td><td>21 000</td><td>4 200</td><td>+14 000</td><td>16%</td><td>8.5%</td><td>7.4 ₽</td><td>220 ₽</td></tr><tr><td>М5</td><td>32 000</td><td>6 400</td><td>+19 000</td><td>16.5%</td><td>8%</td><td>6.6 ₽</td><td>270 ₽</td></tr><tr><td>М6</td><td>46 000</td><td>9 200</td><td>+25 000</td><td>17%</td><td>7.5%</td><td>6.3 ₽</td><td>320 ₽</td></tr><tr><td>М7</td><td>58 000</td><td>11 600</td><td>+27 000</td><td>17.5%</td><td>7%</td><td>5.9 ₽</td><td>350 ₽</td></tr><tr><td>М8</td><td>72 000</td><td>14 400</td><td>+32 000</td><td>18%</td><td>6.8%</td><td>5.5 ₽</td><td>380 ₽</td></tr><tr><td>М9</td><td>82 000</td><td>16 400</td><td>+35 000</td><td>18%</td><td>6.5%</td><td>5.4 ₽</td><td>390 ₽</td></tr><tr><td>М10</td><td>99 000</td><td>19 800</td><td>+40 000</td><td>18.5%</td><td>6.5%</td><td>5.2 ₽</td><td>400 ₽</td></tr><tr><td>М11</td><td>114 000</td><td>22 800</td><td>+45 000</td><td>18.5%</td><td>6.5%</td><td>5.1 ₽</td><td>410 ₽</td></tr><tr class="td-highlight"><td><strong>М12</strong></td><td><strong>132 000</strong></td><td><strong>26 400</strong></td><td><strong>+50 000</strong></td><td><strong>18.5%</strong></td><td><strong>6.5%</strong></td><td><strong>4.9 ₽</strong></td><td><strong>420 ₽</strong></td></tr></tbody></table></div><div class="chart-wrapper" style="height:150px;"><canvas id="realisticMAU"></canvas></div></div>
+        <div class="card card-glow-pink"><div class="card-title">📊 Сравнение LTV / CAC</div><div class="chart-wrapper" style="height:180px;"><canvas id="ltvCacChart"></canvas></div></div>
+        <div class="card card-glow-cyan"><div class="card-title">🔮 Когортный LTV (по возрастам)</div><div class="table-wrap"><table><thead><tr><th>Возраст</th><th>LTV 3 мес</th><th>LTV 6 мес</th><th>LTV 12 мес</th></tr></thead><tbody><tr><td>18–24</td><td>120 ₽</td><td>250 ₽</td><td>380 ₽</td></tr><tr><td>25–34</td><td>180 ₽</td><td>380 ₽</td><td>520 ₽</td></tr><tr><td>35–45</td><td>140 ₽</td><td>290 ₽</td><td>410 ₽</td></tr></tbody></table></div></div>
+        <div class="card card-glow-amber"><div class="card-title">🔗 Реферальная программа</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2;">• Приглашённый: +50 Stars · Пригласивший: +100 Stars при покупке Premium · Ожидаемый эффект: +10% новых юзеров.</div></div>
+        <div class="card card-glow-pink"><div class="card-title">🧪 A/B-тесты онбординга и геймификация первых свайпов</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2;">• <strong style="color:#fff;">Тест 1:</strong> 3 варианта приветственного сообщения (короткое, с видео, с бонусом) — запуск в М2.<br />• <strong style="color:#fff;">Тест 2:</strong> геймификация первых 10 свайпов — показ прогресса (2/10, 5/10) с наградами на каждом этапе (10 Stars за 3 свайпа).<br />• <strong style="color:#fff;">Тест 3:</strong> различные офферы Premium после 5 свайпов (скидка 20% vs бесплатный пробный период на 3 дня).<br />• <strong style="color:#fff;">Метрики:</strong> конверсия в свайп после приветствия, Retention D7, D14.</div></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PAGE 4 — ФИНАНСЫ (+ управление кассовыми разрывами)           -->
+    <!-- ============================================================ -->
+    <div class="page" id="page4">
+        <div class="page-title"><span class="emoji">💰</span> Финансы — полные таблицы</div>
+        <div class="page-sub">Реалистичный · Оптимистичный · Космический · Точка безубыточности · NPV/IRR · Управление кассовыми разрывами</div>
+        <div class="card card-glow-teal"><div class="card-title">📊 Реалистичный</div><div class="table-wrap"><table><thead><tr><th>Месяц</th><th>B2B</th><th>Premium</th><th>Выручка</th><th>Фикс.</th><th>Маркетинг</th><th>Прибыль</th><th>Реинвест</th><th>Чистый доход</th><th>Кумул. Cash</th></tr></thead><tbody><tr><td>М1</td><td>0</td><td>0</td><td>0</td><td>11 400</td><td>55 000</td><td class="td-red">-66 400</td><td>0</td><td>0</td><td class="td-red">-66 400</td></tr><tr><td>М2</td><td>18 000</td><td>14 850</td><td>32 850</td><td>10 400</td><td>39 000</td><td class="td-red">-16 550</td><td>0</td><td>0</td><td class="td-red">-82 950</td></tr><tr><td>М3</td><td>65 000</td><td>39 700</td><td>104 700</td><td>29 400</td><td>0</td><td class="td-green">+75 300</td><td>48 945</td><td>26 355</td><td class="td-red">-56 595</td></tr><tr><td>М4</td><td>95 000</td><td>60 000</td><td>155 000</td><td>40 000</td><td>48 945</td><td class="td-green">+115 000</td><td>74 750</td><td>40 250</td><td class="td-red">-16 345</td></tr><tr><td>М5</td><td>130 000</td><td>80 000</td><td>210 000</td><td>45 000</td><td>74 750</td><td class="td-green">+165 000</td><td>107 250</td><td>57 750</td><td class="td-green">+41 405</td></tr><tr><td>М6</td><td>180 000</td><td>110 000</td><td>290 000</td><td>55 400</td><td>107 250</td><td class="td-green">+234 600</td><td>152 490</td><td>82 110</td><td class="td-green">+123 515</td></tr><tr><td>М7</td><td>210 000</td><td>130 000</td><td>340 000</td><td>60 000</td><td>152 490</td><td class="td-green">+280 000</td><td>182 000</td><td>98 000</td><td class="td-green">+221 515</td></tr><tr><td>М8</td><td>245 000</td><td>150 000</td><td>395 000</td><td>70 000</td><td>182 000</td><td class="td-green">+325 000</td><td>211 250</td><td>113 750</td><td class="td-green">+335 265</td></tr><tr><td>М9</td><td>270 000</td><td>170 000</td><td>440 000</td><td>85 000</td><td>211 250</td><td class="td-green">+355 000</td><td>230 750</td><td>124 250</td><td class="td-green">+459 515</td></tr><tr><td>М10</td><td>310 000</td><td>200 000</td><td>510 000</td><td>90 000</td><td>230 750</td><td class="td-green">+420 000</td><td>273 000</td><td>147 000</td><td class="td-green">+606 515</td></tr><tr><td>М11</td><td>350 000</td><td>230 000</td><td>580 000</td><td>100 000</td><td>273 000</td><td class="td-green">+480 000</td><td>312 000</td><td>168 000</td><td class="td-green">+774 515</td></tr><tr class="td-highlight"><td><strong>М12</strong></td><td><strong>400 000</strong></td><td><strong>250 000</strong></td><td><strong>650 000</strong></td><td><strong>110 400</strong></td><td><strong>312 000</strong></td><td class="td-green"><strong>+539 600</strong></td><td class="td-purple"><strong>350 740</strong></td><td class="td-amber"><strong>188 860</strong></td><td class="td-green"><strong>+963 375</strong></td></tr></tbody></table></div><div class="chart-wrapper" style="height:170px;"><canvas id="financeRealistic"></canvas></div></div>
+        <div class="card card-glow-purple"><div class="card-title">📊 Оптимистичный (М12)</div><div style="font-size:12px;color:var(--text-muted);line-height:1.8;">Выручка: 1 150 000 ₽ · Прибыль: +700 745 ₽ · Чистый доход: 245 261 ₽ · Cash Flow: +1 006 242 ₽</div></div>
+        <div class="card card-glow-amber"><div class="card-title">📊 Космический (М12)</div><div style="font-size:12px;color:var(--text-muted);line-height:1.8;">Выручка: 2 400 000 ₽ · Прибыль: +1 459 089 ₽ · Чистый доход: 510 681 ₽ · Cash Flow: +2 378 686 ₽</div></div>
+        <div class="card card-glow-cyan"><div class="card-title">🧮 NPV, IRR, Точка безубыточности</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;color:var(--text-muted);"><div><strong>Реалистичный:</strong> BEP 5‑й месяц · NPV = 420 000 ₽ · IRR = 68%</div><div><strong>Оптимистичный:</strong> BEP 4‑й месяц · NPV = 780 000 ₽ · IRR = 92%</div><div><strong>Космический:</strong> BEP 3‑й месяц · NPV = 1 450 000 ₽ · IRR = 145%</div><div><strong>Анализ чувствительности:</strong> снижение конверсии на 10% → BEP +1 месяц, IRR падает до 55%.</div></div></div>
+        <div class="card card-glow-purple"><div class="card-title">⚖️ Юридический бюджет</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">Товарный знак 20 000 ₽ (едино) · Консультации 10 000 ₽/квартал · Итого за год: 60 000 ₽.</div></div>
+        <div class="card card-glow-amber"><div class="card-title">🧾 Налоговый план (УСН)</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">УСН 6% (доходы) · Расчёт налога за год (реал.): ~172 113 ₽ · Возможен переход на 15% при росте затрат.</div></div>
+        <div class="card card-glow-pink"><div class="card-title">📉 Управление кассовыми разрывами и кредитные линии</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">• <strong style="color:#fff;">Кассовый разрыв:</strong> максимальный дефицит в М2-М4 (до -82 950 ₽).<br />• <strong style="color:#fff;">Покрытие:</strong> использование личных средств (собственник) или кредитная карта с лимитом 150 000 ₽ (ставка 15% годовых, погашение в М5).<br />• <strong style="color:#fff;">Резервный фонд:</strong> после М5 ежемесячно откладываем 10% от чистой прибыли для покрытия непредвиденных задержек платежей от брендов.<br />• <strong style="color:#fff;">План Б:</strong> факторинг (продажа дебиторской задолженности брендов) — рассматриваем при задержках > 30 дней.</div></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PAGE 5 — КОНТЕНТ (+ аналитика эффективности контента)         -->
+    <!-- ============================================================ -->
+    <div class="page" id="page5">
+        <div class="page-title"><span class="emoji">🎯</span> Контент-план</div>
+        <div class="page-sub">Расписание, недельный календарь, UGC, база знаний, аналитика эффективности контента</div>
+        <div class="grid-2">
+            <div class="card card-glow-amber"><div class="card-title">✍️ Экономика</div><div style="font-size:12.5px;color:var(--text-muted);line-height:2.2;">30 ₽/пост · 5–7 постов/день · Месяц: 5 400 ₽ · Год: 64 800 ₽</div></div>
+            <div class="card card-glow-cyan"><div class="card-title">📈 Целевые метрики</div><div style="font-size:12px;color:var(--text-muted);line-height:2.2;">ER: 6.5% · CTR: 8.2% · Конверсия в свайп: 3.4% · Охват на пост (М12): 4 200</div></div>
+        </div>
+        <div class="card card-glow-purple"><div class="card-title">📅 Детализированное расписание</div><div class="table-wrap"><table><thead><tr><th>Время</th><th>Рубрика</th><th>Формат</th><th>Пример темы</th></tr></thead><tbody><tr><td><span class="tag amber">09:00</span></td><td>Lookbook</td><td>4 фото</td><td>«Офисный кэжуал»</td></tr><tr><td><span class="tag pink">11:30</span></td><td>Разбор звёзд</td><td>Опрос</td><td>«Тимберлейк в коже»</td></tr><tr><td><span class="tag purple">14:00</span></td><td>Вишлист</td><td>UGC</td><td>«Вишлист @modny_parniy»</td></tr><tr><td><span class="tag teal">16:30</span></td><td>Лайфхак</td><td>Текст</td><td>«3 правила выглядеть дорого»</td></tr><tr><td><span class="tag red">19:00</span></td><td>Анонс батла</td><td>Коллаж</td><td>«Батл за Premium»</td></tr><tr><td><span class="tag cyan">21:30</span></td><td>Свайп-опрос</td><td>Фото</td><td>«Эти ботинки — тренд?»</td></tr><tr class="td-highlight"><td><span class="tag amber">ВС 12:00</span></td><td>Итоги недели</td><td>Викторина</td><td>«Победитель батла, викторина»</td></tr></tbody></table></div></div>
+        <div class="card card-glow-pink"><div class="card-title">📅 Недельный календарь (пример)</div><div style="font-size:11px;color:var(--text-muted);line-height:1.8;"><strong>ПН:</strong> Lookbook «Минимализм» · <strong>ВТ:</strong> Разбор звёзд «Бейонсе» · <strong>СР:</strong> Вишлист пользователя · <strong>ЧТ:</strong> Лайфхак «Как носить оверсайз» · <strong>ПТ:</strong> Анонс батла · <strong>СБ:</strong> Свайп-опрос · <strong>ВС:</strong> Итоги недели + викторина</div></div>
+        <div class="card card-glow-cyan"><div class="card-title">💡 Стратегия UGC и база знаний</div><div style="font-size:11.5px;color:var(--text-muted);line-height:1.8;">• Конкурсы вишлистов ежемесячно · Репосты лучших образов · Стикерпак · Контент-матрица: 40% вдохновение, 30% интерактив, 20% полезное, 10% геймификация.<br />• Видео-инструкции (бюджет 5 000 ₽) и текстовые FAQ.</div></div>
+        <div class="card card-glow-teal"><div class="card-title">📊 Аналитика эффективности контента</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2;">• <strong style="color:#fff;">Какие посты дают больше переходов:</strong> отслеживаем клики по ссылкам (UTM-метки) — топ-3 рубрик: Lookbook, Анонс батла, Лайфхак.<br />• <strong style="color:#fff;">Конверсия в свайп:</strong> по каждому посту замеряем, сколько пользователей перешли в приложение и сделали свайп в течение 1 часа.<br />• <strong style="color:#fff;">Время публикации:</strong> A/B-тест (09:00 vs 10:00) для Lookbook — определяем оптимальное время.<br />• <strong style="color:#fff;">Отчёт:</strong> еженедельный Excel-отчёт для контент-менеджера, корректировка стратегии.</div></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PAGE 6 — СТРАТЕГИЯ (+ корпоративная культура)                -->
+    <!-- ============================================================ -->
+    <div class="page" id="page6">
+        <div class="page-title"><span class="emoji">🧠</span> Глобальная стратегия</div>
+        <div class="page-sub">Продуктовый роадмап, Юриспруденция, Антикризис, Экспансия, Инвестиции, Мобильное приложение, Корпоративная культура</div>
+        <div class="card card-glow-purple"><div class="card-title">🗺️ Продуктовый роадмап</div><div class="table-wrap"><table><thead><tr><th>Квартал</th><th>Версия</th><th>Фичи</th></tr></thead><tbody><tr><td>Q1</td><td>v1.0</td><td>Базовый свайп, PvP, Premium</td></tr><tr><td>Q2</td><td>v1.1</td><td>Профили, лента друзей, реферальная программа</td></tr><tr><td>Q3</td><td>v2.0</td><td>B2B-кабинеты, CPM-аукцион</td></tr><tr><td>Q4</td><td>v2.1</td><td>Style-DNA 2.0, экспорт в WB/Ozon</td></tr></tbody></table></div></div>
+        <div class="grid-2">
+            <div class="card card-glow-teal"><div class="card-title">⚖️ Юридическая база</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2;">Оферта · Политика конфиденциальности · B2B-договор · ИП / Самозанятость</div></div>
+            <div class="card card-glow-pink"><div class="card-title">🚨 Антикризис</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2;"><span class="tag amber">Жёлтый</span> A/B-тест · <span class="tag red">Оранжевый</span> PWA · <span class="tag red">Красный</span> Виралка + инфлюенсеры</div></div>
+        </div>
+        <div class="grid-2">
+            <div class="card card-glow-cyan"><div class="card-title">🌍 Экспансия</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">М12-15: СНГ (80 000 ₽) · М16-20: Европа (300 000 ₽)</div></div>
+            <div class="card card-glow-amber"><div class="card-title">📈 Инвестиции</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">Потребность: 2 000 000 ₽ · Оценка: 15 000 000 ₽ · Доля: 20%</div></div>
+        </div>
+        <div class="card card-glow-purple"><div class="card-title">📊 Монетизация данных</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">Тариф «Аналитика» для брендов — 3 000 ₽/мес.</div></div>
+        <div class="card card-glow-cyan"><div class="card-title">📱 Мобильное приложение</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">React Native · Бюджет 200 000 ₽ · Срок 3 месяца (Q3-Q4).</div></div>
+        <div class="card card-glow-pink"><div class="card-title">💡 Корпоративная культура и ценности</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">• <strong style="color:#fff;">Ценности:</strong> «Пользователь всегда прав», «Скорость решает всё», «Инновации через простоту».<br />• <strong style="color:#fff;">Командные ритуалы:</strong> еженедельная синхронизация (15 мин), ретроспектива раз в спринт, общие обеды раз в месяц (онлайн).<br />• <strong style="color:#fff;">Обратная связь:</strong> анонимные опросы команды раз в квартал (удовлетворённость, идеи).<br />• <strong style="color:#fff;">Обучение:</strong> бюджет 10 000 ₽/год на курсы для сотрудников (Python, маркетинг).</div></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PAGE 7 — АНАЛИТИКА (+ дашборды в реальном времени)            -->
+    <!-- ============================================================ -->
+    <div class="page" id="page7">
+        <div class="page-title"><span class="emoji">🏛️</span> Аналитика, Команда, Gantt, Exit</div>
+        <div class="page-sub">Конкурентный бенчмаркинг, оргструктура, DevOps, NPS, Gantt, SEO, дашборды</div>
+        <div class="card card-glow-pink"><div class="card-title">🔍 Конкурентный бенчмаркинг</div><div class="table-wrap"><table><thead><tr><th>Конкурент</th><th>Сильные</th><th>Слабые</th><th>Доля</th><th>Как обходим</th></tr></thead><tbody><tr><td><strong>WhoWhatWear</strong></td><td>Трафик, SEO</td><td>Нет геймификации</td><td>30%</td><td>PvP + Stars</td></tr><tr><td><strong>Lookbook</strong></td><td>Комьюнити</td><td>Устаревший UI</td><td>20%</td><td>Свайп + AI</td></tr><tr><td><strong>TG-каналы</strong></td><td>Вовлечённость</td><td>Нет персонализации</td><td>40%</td><td>Style-DNA</td></tr></tbody></table></div></div>
+        <div class="card card-glow-teal"><div class="card-title">👥 Оргструктура (з/п)</div><div class="table-wrap"><table><thead><tr><th>Роль</th><th>М1-3</th><th>М4-6</th><th>М7-12</th></tr></thead><tbody><tr><td>Контент-менеджер</td><td>5 400</td><td>5 400</td><td>5 400</td></tr><tr><td>Разработчик</td><td>0</td><td>30 000</td><td>50 000</td></tr><tr><td>SMM-менеджер</td><td>—</td><td>20 000</td><td>25 000</td></tr><tr><td>Дизайнер</td><td>—</td><td>—</td><td>20 000</td></tr><tr><td>Support / Аналитик</td><td>—</td><td>—</td><td>15 000</td></tr></tbody></table></div></div>
+        <div class="grid-2">
+            <div class="card card-glow-cyan"><div class="card-title">☁️ DevOps-бюджет</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">М1-3: 3 000 ₽ · М4-6: 8 000 ₽ · М7-12: 15 000 ₽</div></div>
+            <div class="card card-glow-purple"><div class="card-title">💬 NPS &amp; Качество</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">Цель NPS > 60 · CES < 2 мин · Ответ на баги < 4 ч</div></div>
+        </div>
+        <div class="card card-glow-amber"><div class="card-title">📅 Gantt-график</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2.2;"><span class="tag teal">М1</span> MVP · <span class="tag purple">М3</span> Бета · <span class="tag pink">М4</span> Релиз · <span class="tag amber">М6</span> PvP+B2B · <span class="tag cyan">М9</span> CPM-аукцион · <span class="tag purple">М12</span> 132K MAU · <span class="tag green">М15</span> СНГ · <span class="tag red">М20</span> Европа</div></div>
+        <div class="card card-glow-pink"><div class="card-title">🚀 Сценарии выхода</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:12px;color:var(--text-muted);"><div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-weight:800;color:var(--teal);">Продажа стратегу</div><div>8–12x от выручки</div></div><div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-weight:800;color:var(--purple);">IPO / SPAC</div><div>через 5–7 лет</div></div><div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-weight:800;color:var(--amber);">Дивиденды</div><div>постоянный cash flow</div></div></div></div>
+        <div class="card card-glow-cyan"><div class="card-title">🔍 SEO-план</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">Ключевые слова (10–15) · 5 статей (бюджет 5 000 ₽) · Техническое SEO.</div></div>
+        <div class="card card-glow-purple"><div class="card-title">📊 Дашборды для мониторинга KPI в реальном времени</div><div style="font-size:12px;color:var(--text-muted);line-height:2;">• <strong style="color:#fff;">Дашборд 1 (для команды):</strong> Grafana — MAU, DAU, Retention D30, выручка за сегодня/неделю, количество свайпов.<br />• <strong style="color:#fff;">Дашборд 2 (для брендов):</strong> отдельный публичный дашборд (с ограниченным доступом) — CTR их вещей, демография, тренды.<br />• <strong style="color:#fff;">Дашборд 3 (финансовый):</strong> кумулятивный Cash Flow, реинвест, чистая прибыль — обновление ежедневно.<br />• <strong style="color:#fff;">Техническая реализация:</strong> подключение к ClickHouse / BigQuery, настройка в Q2.</div></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PAGE 8 — B2B-ВОРОНКА, KPI, СТРАТЕГИЧЕСКИЕ АЛЬЯНСЫ           -->
+    <!-- ============================================================ -->
+    <div class="page" id="page8">
+        <div class="page-title"><span class="emoji">🏁</span> B2B-воронка, KPI-Дашборд, Стратегические альянсы</div>
+        <div class="page-sub">Детальная воронка с цифрами, KPI для отделов, крауд-маркетинг, интеграции, стратегические альянсы</div>
+
+        <div class="card card-glow-amber"><div class="card-title">🤝 B2B-воронка (цифры)</div><div class="table-wrap"><table><thead><tr><th>Этап</th><th>Действие</th><th>Конверсия</th><th>Кол-во (М12)</th></tr></thead><tbody><tr><td>1. Лидогенерация</td><td>Холодные email / LinkedIn</td><td>—</td><td>~200 контактов</td></tr><tr><td>2. Первый контакт</td><td>Презентация, демо</td><td>25% → встреча</td><td>50 встреч</td></tr><tr><td>3. Тестовый период</td><td>Загрузка 10 вещей, анализ CTR</td><td>50% → оплата</td><td>25 брендов</td></tr><tr><td>4. Подписка</td><td>Тариф «Базовый» (5 000 ₽/мес) или «Про» (15 000 ₽/мес + CPM)</td><td>70% продление</td><td>18 брендов</td></tr><tr><td>5. Апсейл</td><td>Доп. услуги: аналитика, расширенный CPM</td><td>20% → повышение</td><td>~4 бренда на «Про»</td></tr></tbody></table></div><div style="font-size:11px;color:var(--text-muted);margin-top:4px;">CAC B2B = 8 000 ₽ · LTV бренда = 96 000 ₽.</div></div>
+
+        <div class="card card-glow-cyan"><div class="card-title">📊 KPI-Дашборд (М12)</div><div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:8px;">
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--teal);">132K</div><div style="font-size:11px;color:var(--text-muted);">MAU</div></div>
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--purple);">26.4K</div><div style="font-size:11px;color:var(--text-muted);">DAU</div></div>
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--pink);">18.5%</div><div style="font-size:11px;color:var(--text-muted);">Ret D30</div></div>
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--amber);">6.5%</div><div style="font-size:11px;color:var(--text-muted);">Churn</div></div>
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--cyan);">4.9 ₽</div><div style="font-size:11px;color:var(--text-muted);">ARPU</div></div>
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--green);">420 ₽</div><div style="font-size:11px;color:var(--text-muted);">LTV</div></div>
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--red);">90 ₽</div><div style="font-size:11px;color:var(--text-muted);">CAC</div></div>
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--purple);">4.7x</div><div style="font-size:11px;color:var(--text-muted);">LTV/CAC</div></div>
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--amber);">188 860 ₽</div><div style="font-size:11px;color:var(--text-muted);">Чистый доход</div></div>
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--teal);">+963K</div><div style="font-size:11px;color:var(--text-muted);">Кумул. Cash</div></div>
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--pink);">2.1%</div><div style="font-size:11px;color:var(--text-muted);">Premium CR</div></div>
+            <div style="background:var(--surface-2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--cyan);">45</div><div style="font-size:11px;color:var(--text-muted);">B2B-клиентов</div></div>
+        </div></div>
+
+        <div class="grid-2">
+            <div class="card card-glow-pink"><div class="card-title">📊 KPI для отделов</div><div style="font-size:11.5px;color:var(--text-muted);line-height:2.2;"><strong>Маркетинг:</strong> CAC < 90 ₽, CPC < 12 ₽, CTR > 8%<br /><strong>Продукт:</strong> Retention D30 > 18%, Churn < 7%<br /><strong>B2B:</strong> >45 брендов, средний чек > 8 000 ₽<br /><strong>Контент:</strong> ER > 6%, охват > 4 000</div></div>
+            <div class="card card-glow-amber"><div class="card-title">🛡️ Резервный бюджет</div><div style="font-size:12px;color:var(--text-muted);line-height:2.2;">• Размер: 15% от операционных расходов (~16 500 ₽ в М12).<br />• Накопление: 5% от чистой прибыли до 200 000 ₽.<br />• Назначение: юридические споры, срочные доработки, форс-мажоры.</div></div>
+        </div>
+
+        <div class="card card-glow-cyan"><div class="card-title">🛒 Крауд-маркетинг и совместные покупки</div><div style="font-size:12px;color:var(--text-muted);line-height:2.2;">Механика: голосование за вещь, при 100 голосах — скидка 20% для всех проголосовавших. Запуск в Q3.</div></div>
+
+        <div class="card card-glow-purple"><div class="card-title">🔌 Интеграция с маркетплейсами (WB / Ozon)</div><div style="font-size:12px;color:var(--text-muted);line-height:2.2;">Экспорт вишлистов в корзину · Бюджет 50 000 ₽ · Срок: Q4.</div></div>
+
+        <div class="card card-glow-pink"><div class="card-title">🤝 Стратегические альянсы и совместные акции</div><div style="font-size:12px;color:var(--text-muted);line-height:2.2;">• <strong style="color:#fff;">Партнёр с блогерскими агентствами:</strong> размещение батлов в их каналах (бартер: 10 Premium-подписок).<br />• <strong style="color:#fff;">Совместные акции с брендами одежды:</strong> «Собери вишлист и получи скидку 15% в магазине бренда» — кросс-промо.<br />• <strong style="color:#fff;">Технологические партнёры:</strong> интеграция с платформами аналитики (например, Amplitude) для обмена данными (бесплатно, в обмен на кейс).<br />• <strong style="color:#fff;">План по поиску альянсов:</strong> составление списка из 20 потенциальных партнёров в Q2, проведение переговоров в Q3.</div></div>
+
+        <!-- ФИНАЛ (8 страниц) -->
+        <div class="card" style="background:linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border:1px solid rgba(255,255,255,0.06); text-align:center; padding:30px 24px;">
+            <div style="font-size:38px; margin-bottom:6px;">🏁</div>
+            <div style="font-size:26px; font-weight:900; letter-spacing:-0.5px; background:var(--grad-1); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">ИТОГОВЫЙ СТАТУС (8 страниц, АБСОЛЮТНЫЙ МАКСИМУМ)</div>
+            <p style="max-width:800px; margin:12px auto 0; color:var(--text-muted); font-size:14px; line-height:1.8;">
+                ✅ Полный технический план с QA, админкой и мониторингом.<br />
+                ✅ Маркетинг с инфлюенсерами, PR и стратегией управления репутацией.<br />
+                ✅ Юзеры с A/B-тестами онбординга и реферальной программой.<br />
+                ✅ Финансы с управлением кассовыми разрывами и кредитными линиями.<br />
+                ✅ Контент с аналитикой эффективности каждого поста.<br />
+                ✅ Стратегия с корпоративной культурой и ценностями.<br />
+                ✅ Аналитика с дашбордами в реальном времени для команды и брендов.<br />
+                ✅ B2B-воронка с KPI, крауд-маркетингом, интеграциями и стратегическими альянсами.<br />
+                <span style="color:var(--teal);">Абсолютный максимум. Готов к запуску, переговорам с инвесторами, масштабированию и защите перед любыми вопросами.</span>
+            </p>
+            <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-top:14px;">
+                <span class="tag">✅ Без CPA</span><span class="tag teal">✅ 65% Реинвест</span>
+                <span class="tag pink">✅ 24 Спринта</span><span class="tag amber">✅ 3 Сценария</span>
+                <span class="tag green">✅ LTV/CAC до 11.7x</span><span class="tag cyan">✅ 8 страниц</span>
+                <span class="tag" style="background:rgba(245,158,11,0.2);color:var(--amber);">✅ Дашборды</span>
+                <span class="tag" style="background:rgba(139,92,246,0.2);color:var(--purple);">✅ Альянсы</span>
+                <span class="tag" style="background:rgba(20,184,166,0.2);color:var(--teal);">✅ Корп. культура</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SCRIPTS                                                       -->
+    <!-- ============================================================ -->
+    <script>
+        function goPage(n) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('page' + n).classList.add('active');
+            document.querySelectorAll('.tab-btn')[n - 1].classList.add('active');
+            document.getElementById('pageIndicator').textContent = n;
+        }
+
+        let chartInstances = [];
+
+        function initCharts() {
+            // SCENARIO
+            const ctx1 = document.getElementById('scenarioChart').getContext('2d');
+            chartInstances.push(new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: ['М1','М2','М3','М4','М5','М6','М7','М8','М9','М10','М11','М12'],
+                    datasets: [
+                        { label: 'Реалистичный', data: [2400,6300,13500,21000,32000,46000,58000,72000,82000,99000,114000,132000], borderColor:'#14b8a6', fill:true, tension:0.3, borderWidth:3, pointRadius:3 },
+                        { label: 'Оптимистичный', data: [2400,7000,16200,28000,42000,68000,88000,115000,135000,160000,185000,210000], borderColor:'#8b5cf6', fill:true, tension:0.3, borderWidth:3, pointRadius:3, borderDash:[5,5] },
+                        { label: 'Космический', data: [2400,8500,22000,40000,65000,115000,160000,220000,245000,290000,330000,380000], borderColor:'#f59e0b', fill:true, tension:0.3, borderWidth:3, pointRadius:3, borderDash:[2,4] }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color:'#9a98a0', font:{size:11}, boxWidth:12, padding:10 } } }, scales: { y: { grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#9a98a0',font:{size:9}}, beginAtZero:true }, x: { grid:{display:false}, ticks:{color:'#9a98a0',font:{size:9}} } } }
+            }));
+
+            // USER
+            const ctx2 = document.getElementById('realisticMAU').getContext('2d');
+            chartInstances.push(new Chart(ctx2, {
+                type: 'bar',
+                data: { labels: ['М1','М2','М3','М4','М5','М6','М7','М8','М9','М10','М11','М12'], datasets: [{ label: 'MAU', data: [2400,6300,13500,21000,32000,46000,58000,72000,82000,99000,114000,132000], backgroundColor: '#14b8a640', borderColor: '#14b8a6', borderWidth:2, borderRadius:4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#9a98a0',font:{size:9}}, beginAtZero:true }, x: { grid:{display:false}, ticks:{color:'#9a98a0',font:{size:9}} } } }
+            }));
+
+            // LTV/CAC
+            const ctx3 = document.getElementById('ltvCacChart').getContext('2d');
+            chartInstances.push(new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: ['Реалистичный', 'Оптимистичный', 'Космический'],
+                    datasets: [
+                        { label: 'LTV (₽)', data: [420,580,820], backgroundColor:'rgba(20,184,166,0.5)', borderColor:'#14b8a6', borderWidth:2, borderRadius:4 },
+                        { label: 'CAC (₽)', data: [90,85,70], backgroundColor:'rgba(139,92,246,0.5)', borderColor:'#8b5cf6', borderWidth:2, borderRadius:4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color:'#9a98a0', font:{size:11}, boxWidth:12, padding:10 } } }, scales: { y: { grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#9a98a0',font:{size:9}}, beginAtZero:true }, x: { grid:{display:false}, ticks:{color:'#9a98a0',font:{size:9}} } } }
+            }));
+
+            // FINANCE
+            const ctx4 = document.getElementById('financeRealistic').getContext('2d');
+            const revReal = [0,32850,104700,155000,210000,290000,340000,395000,440000,510000,580000,650000];
+            const reinReal = [0,0,48945,74750,107250,152490,182000,211250,230750,273000,312000,350740];
+            chartInstances.push(new Chart(ctx4, {
+                type: 'bar',
+                data: {
+                    labels: ['М1','М2','М3','М4','М5','М6','М7','М8','М9','М10','М11','М12'],
+                    datasets: [
+                        { label: 'Выручка', data: revReal, backgroundColor: '#14b8a650', borderColor: '#14b8a6', borderWidth:2, borderRadius:4, order:2 },
+                        { label: 'Реинвест 65%', data: reinReal, backgroundColor: 'rgba(139,92,246,0.5)', borderColor: '#8b5cf6', borderWidth:2, borderRadius:4, order:1 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color:'#9a98a0', font:{size:10}, boxWidth:10, padding:8 } } }, scales: { y: { grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#9a98a0',font:{size:8}}, beginAtZero:true }, x: { grid:{display:false}, ticks:{color:'#9a98a0',font:{size:8}} } } }
+            }));
+        }
+
+        window.onload = function() { initCharts(); };
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => { chartInstances.forEach(chart => chart.resize()); }, 200);
+        });
+    </script>
+</body>
+</html>

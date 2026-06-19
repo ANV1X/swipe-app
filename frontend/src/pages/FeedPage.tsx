@@ -1,125 +1,132 @@
-import { useState, useRef } from 'react'
-import { SlidersHorizontal, ChevronDown, X, Heart, Bookmark, Star } from 'lucide-react'
-
-interface Product {
-  id: number
-  brand: string
-  name: string
-  price: string
-  oldPrice?: string
-  image: string
-  marketplace: string
-  marketplaceLogo: string
-  rating: string
-  discount?: string
-}
-
-const PRODUCTS: Product[] = [
-  {
-    id: 1,
-    brand: 'COS',
-    name: 'Кардиган из шерсти',
-    price: '8 990 ₽',
-    image: 'https://images.pexels.com/photos/1183266/pexels-photo-1183266.jpeg?auto=compress&cs=tinysrgb&w=600',
-    marketplace: 'Lamoda',
-    marketplaceLogo: 'https://images.pexels.com/photos/1183266/pexels-photo-1183266.jpeg?auto=compress&w=32',
-    rating: '4.0',
-  },
-  {
-    id: 2,
-    brand: 'Zara',
-    name: 'Прямые джинсы',
-    price: '5 990 ₽',
-    oldPrice: '7 990 ₽',
-    image: 'https://images.pexels.com/photos/1598505/pexels-photo-1598505.jpeg?auto=compress&cs=tinysrgb&w=600',
-    marketplace: 'Wildberries',
-    marketplaceLogo: 'https://images.pexels.com/photos/1598505/pexels-photo-1598505.jpeg?auto=compress&w=32',
-    discount: '-25%',
-    rating: '4.5',
-  },
-  {
-    id: 3,
-    brand: 'Massimo Dutti',
-    name: 'Пальто оверсайз',
-    price: '14 990 ₽',
-    image: 'https://images.pexels.com/photos/1040945/pexels-photo-1040945.jpeg?auto=compress&cs=tinysrgb&w=600',
-    marketplace: 'Ozon',
-    marketplaceLogo: 'https://images.pexels.com/photos/1040945/pexels-photo-1040945.jpeg?auto=compress&w=32',
-    rating: '4.8',
-  },
-  {
-    id: 4,
-    brand: 'New Balance',
-    name: 'Кроссовки 530',
-    price: '9 990 ₽',
-    oldPrice: '12 500 ₽',
-    image: 'https://images.pexels.com/photos/2529148/pexels-photo-2529148.jpeg?auto=compress&cs=tinysrgb&w=600',
-    marketplace: 'Lamoda',
-    marketplaceLogo: 'https://images.pexels.com/photos/2529148/pexels-photo-2529148.jpeg?auto=compress&w=32',
-    discount: '-20%',
-    rating: '4.7',
-  },
-]
+import { useEffect, useRef, useState } from 'react'
+import { SlidersHorizontal, ChevronDown, X, Heart } from 'lucide-react'
+import { supabase, Product, getAnonId } from '../lib/supabase'
 
 const CATEGORIES = ['Все', 'Одежда', 'Обувь', 'Аксессуары']
 
-const MP_COLORS: Record<string, string> = {
-  Lamoda: '#FF6B35',
-  Wildberries: '#CB11AB',
-  Ozon: '#005BFF',
-  'Яндекс Маркет': '#FFCC00',
+function formatPrice(p: number) {
+  return p.toLocaleString('ru-RU') + ' ₽'
+}
+
+const RATINGS: Record<string, string> = {}
+function getRating(id: string) {
+  if (!RATINGS[id]) RATINGS[id] = `4.${Math.floor(Math.random() * 4 + 5)}`
+  return RATINGS[id]
 }
 
 export default function FeedPage() {
-  const [activeCategory, setActiveCategory] = useState('Все')
-  const [dragging, setDragging] = useState(false)
-  const [dragX, setDragX] = useState(0)
-  const [swipedItems, setSwipedItems] = useState<Set<number>>(new Set())
-  const [wishlist, setWishlist] = useState<Set<number>>(new Set())
-  const dragStart = useRef<number | null>(null)
+  const [cards, setCards] = useState<Product[]>([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [category, setCategory] = useState('Все')
+  const [wishlist, setWishlist] = useState<Set<string>>(new Set())
+  const [swipeDir, setSwipeDir] = useState<'like' | 'nope' | null>(null)
+  const startX = useRef(0)
+  const currentX = useRef(0)
+  const isDragging = useRef(false)
+  const cardRef = useRef<HTMLDivElement>(null)
 
-  const visible = PRODUCTS.filter(p => !swipedItems.has(p.id))
-  const topProduct = visible[0]
+  useEffect(() => { loadProducts() }, [category])
+  useEffect(() => { loadWishlist() }, [])
 
-  function handlePointerDown(e: React.PointerEvent) {
-    dragStart.current = e.clientX
-    setDragging(true)
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  async function loadProducts() {
+    let q = supabase.from('products').select('*').order('created_at', { ascending: false })
+    if (category !== 'Все') q = q.eq('category', category)
+    const { data } = await q
+    setCards(data || [])
+    setCurrentIndex(0)
   }
 
-  function handlePointerMove(e: React.PointerEvent) {
-    if (!dragging || dragStart.current === null) return
-    setDragX(e.clientX - dragStart.current)
+  async function loadWishlist() {
+    const userId = getAnonId()
+    const { data } = await supabase.from('wishlist').select('product_id').eq('user_id', userId)
+    setWishlist(new Set(data?.map(d => d.product_id) || []))
   }
 
-  function handlePointerUp() {
-    if (!topProduct) return
-    if (Math.abs(dragX) > 90) {
-      swipe(dragX > 0 ? 'right' : 'left')
-    } else {
-      setDragX(0)
+  const card = cards[currentIndex]
+
+  function onPointerDown(e: React.PointerEvent) {
+    isDragging.current = true
+    startX.current = e.clientX
+    currentX.current = 0
+    if (cardRef.current) {
+      cardRef.current.setPointerCapture(e.pointerId)
+      cardRef.current.style.transition = 'none'
     }
-    setDragging(false)
-    dragStart.current = null
   }
 
-  function swipe(dir: 'left' | 'right') {
-    if (!topProduct) return
-    if (dir === 'right') setWishlist(prev => new Set([...prev, topProduct.id]))
-    setSwipedItems(prev => new Set([...prev, topProduct.id]))
-    setDragX(0)
+  function onPointerMove(e: React.PointerEvent) {
+    if (!isDragging.current) return
+    const dx = e.clientX - startX.current
+    currentX.current = dx
+    const rotation = dx * 0.07
+    if (cardRef.current) {
+      cardRef.current.style.transform = `translateX(${dx}px) rotate(${rotation}deg)`
+    }
+    if (dx > 40) setSwipeDir('like')
+    else if (dx < -40) setSwipeDir('nope')
+    else setSwipeDir(null)
   }
 
-  const rotate = dragging ? dragX * 0.05 : 0
-  const likeOpacity = Math.max(0, Math.min(1, dragX / 100))
-  const nopeOpacity = Math.max(0, Math.min(1, -dragX / 100))
+  function onPointerUp() {
+    if (!isDragging.current) return
+    isDragging.current = false
+    const dx = currentX.current
+    if (dx > 80) flyOut('like')
+    else if (dx < -80) flyOut('nope')
+    else {
+      if (cardRef.current) {
+        cardRef.current.style.transition = 'transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94)'
+        cardRef.current.style.transform = 'translateX(0) rotate(0deg)'
+      }
+      setSwipeDir(null)
+    }
+  }
+
+  function flyOut(dir: 'like' | 'nope') {
+    if (!cardRef.current || !card) return
+    const x = dir === 'like' ? 520 : -520
+    cardRef.current.style.transition = 'transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94)'
+    cardRef.current.style.transform = `translateX(${x}px) rotate(${dir === 'like' ? 20 : -20}deg)`
+    recordSwipe(dir)
+    setTimeout(() => {
+      setSwipeDir(null)
+      setCurrentIndex(i => i + 1)
+      if (cardRef.current) cardRef.current.style.transform = ''
+    }, 360)
+  }
+
+  async function recordSwipe(dir: 'like' | 'nope') {
+    if (!card) return
+    const userId = getAnonId()
+    await supabase.from('swipes').insert({ user_id: userId, product_id: card.id, direction: dir })
+    if (dir === 'like') {
+      await supabase.from('wishlist').upsert({ user_id: userId, product_id: card.id, notify_price_drop: true })
+      setWishlist(s => new Set([...s, card.id]))
+    }
+  }
+
+  if (!card && cards.length > 0) {
+    return (
+      <div className="feed-page">
+        <div className="page-center" style={{ flex: 1 }}>
+          <div style={{ fontSize: 48 }}>✨</div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>Всё просмотрено!</div>
+          <div style={{ fontSize: 14, color: 'var(--text2)', textAlign: 'center', lineHeight: 1.5 }}>
+            Мы подберём новые товары под ваш вкус
+          </div>
+          <button className="btn-primary" style={{ width: 'auto', padding: '14px 32px', marginTop: 8 }} onClick={loadProducts}>
+            Обновить
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="feed-page">
       <div className="feed-topbar">
         <div className="feed-title">
-          Лента
-          <ChevronDown size={20} strokeWidth={2} />
+          Лента <ChevronDown size={18} style={{ color: 'var(--text)' }} />
         </div>
         <button className="feed-filter-btn">
           <SlidersHorizontal size={18} />
@@ -127,125 +134,79 @@ export default function FeedPage() {
       </div>
 
       <div className="filter-bar">
-        {CATEGORIES.map(cat => (
+        {CATEGORIES.map(c => (
           <button
-            key={cat}
-            className={`filter-chip${activeCategory === cat ? ' active' : ''}`}
-            onClick={() => setActiveCategory(cat)}
-          >{cat}</button>
+            key={c}
+            className={`filter-chip${category === c ? ' active' : ''}`}
+            onClick={() => setCategory(c)}
+          >{c}</button>
         ))}
       </div>
 
       <div className="card-stack">
-        {visible.length === 0 && (
-          <div className="page-center">
-            <div style={{ fontSize: 48, marginBottom: 8 }}>🎉</div>
-            <p style={{ fontWeight: 700, color: 'var(--text)', fontSize: 17 }}>Всё просмотрено!</p>
-            <p style={{ color: 'var(--text2)', fontSize: 14 }}>Зайди позже — будет новое</p>
-          </div>
-        )}
-
-        {/* Background cards */}
-        {visible.slice(1, 3).reverse().map((product, i) => (
-          <div
-            key={product.id}
-            className="swipe-card"
-            style={{
-              transform: `scale(${0.94 + i * 0.03}) translateY(${(1 - i) * 12}px)`,
-              zIndex: i,
-            }}
-          >
-            <div className="card-image-wrap">
-              <img src={product.image} alt={product.name} />
-            </div>
-          </div>
-        ))}
-
-        {/* Top card */}
-        {topProduct && (
-          <div
-            className="swipe-card"
-            style={{
-              transform: `translateX(${dragX}px) rotate(${rotate}deg)`,
-              transition: dragging ? 'none' : 'transform 0.35s cubic-bezier(.23,1,.32,1)',
-              zIndex: 10,
-            }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-          >
-            {likeOpacity > 0.05 && (
-              <div className="swipe-indicator-like" style={{ opacity: likeOpacity }}>НРАВИТСЯ</div>
-            )}
-            {nopeOpacity > 0.05 && (
-              <div className="swipe-indicator-nope" style={{ opacity: nopeOpacity }}>МИМО</div>
-            )}
-
-            <div className="card-image-wrap">
-              <img src={topProduct.image} alt={topProduct.name} />
-
-              {/* Bookmark top-right */}
-              <button
-                className={`card-bookmark-btn${wishlist.has(topProduct.id) ? ' saved' : ''}`}
-                onClick={e => {
-                  e.stopPropagation()
-                  setWishlist(prev => {
-                    const next = new Set(prev)
-                    next.has(topProduct.id) ? next.delete(topProduct.id) : next.add(topProduct.id)
-                    return next
-                  })
-                }}
+        {cards.length === 0 ? (
+          <div className="page-center"><div className="spinner" /></div>
+        ) : card ? (
+          <>
+            {cards[currentIndex + 1] && (
+              <div
+                className="swipe-card"
+                style={{ transform: 'scale(0.93) translateY(14px)', zIndex: 0, pointerEvents: 'none', opacity: 0.75 }}
               >
-                <Bookmark size={17} fill={wishlist.has(topProduct.id) ? 'var(--accent)' : 'none'} strokeWidth={2} />
-              </button>
-
-              {/* Discount badge top-right (when no bookmark overlap) */}
-              {topProduct.discount && (
-                <div className="card-discount-badge">{topProduct.discount}</div>
-              )}
-
-              {/* Bottom overlay: shop + product info + rating */}
-              <div className="card-overlay">
-                {/* Brand / name / price row */}
-                <div className="card-overlay-brand">{topProduct.brand}</div>
-                <div className="card-overlay-title">{topProduct.name}</div>
-                <div className="card-overlay-price-row">
-                  <span className="card-overlay-price">{topProduct.price}</span>
-                  {topProduct.oldPrice && (
-                    <span className="card-overlay-price-old">{topProduct.oldPrice}</span>
-                  )}
+                <div className="card-image-wrap">
+                  <img src={cards[currentIndex + 1].image_url || ''} alt="" />
                 </div>
-
-                {/* Shop row: icon + name (left) and rating (right) */}
-                <div className="card-overlay-shop-row">
-                  <div className="card-overlay-shop">
-                    <div
-                      className="card-overlay-shop-dot"
-                      style={{ background: MP_COLORS[topProduct.marketplace] ?? '#666' }}
-                    />
-                    <span className="card-overlay-shop-name">{topProduct.marketplace}</span>
+              </div>
+            )}
+            <div
+              ref={cardRef}
+              className="swipe-card"
+              style={{ zIndex: 1 }}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+            >
+              <div className="card-image-wrap">
+                <img src={card.image_url || ''} alt={card.title} />
+                <div className="card-mp-badge">{card.marketplace}</div>
+                {card.discount_pct && (
+                  <div className="card-discount-badge">-{card.discount_pct}%</div>
+                )}
+                {swipeDir === 'like' && <div className="swipe-indicator-like">ЛАЙК</div>}
+                {swipeDir === 'nope' && <div className="swipe-indicator-nope">НЕЕЕ</div>}
+                <div className="card-overlay">
+                  <div className="card-overlay-brand">{card.brand || card.marketplace}</div>
+                  <div className="card-overlay-title">{card.title}</div>
+                  <div className="card-overlay-price-row">
+                    <div className="card-overlay-price">{formatPrice(card.price)}</div>
+                    {card.price_old && <div className="card-overlay-price-old">{formatPrice(card.price_old)}</div>}
                   </div>
-                  <div className="card-overlay-rating">
-                    <Star size={11} fill="#FFD60A" color="#FFD60A" />
-                    <span>{topProduct.rating}</span>
+                  <div className="card-overlay-shop-row">
+                    <div className="card-overlay-shop">
+                      <div className="card-overlay-shop-dot" />
+                      <div className="card-overlay-shop-name">{card.marketplace}</div>
+                    </div>
+                    <div className="card-overlay-rating">★ {getRating(card.id)}</div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          </>
+        ) : null}
       </div>
 
-      {visible.length > 0 && (
-        <div className="action-buttons">
-          <button className="action-btn action-btn--nope" onClick={() => swipe('left')}>
-            <X size={24} strokeWidth={2.5} />
-          </button>
-          <button className="action-btn action-btn--like" onClick={() => swipe('right')}>
-            <Heart size={26} fill="white" strokeWidth={0} />
-          </button>
-        </div>
-      )}
+      <div className="action-buttons">
+        <button className="action-btn action-btn--nope" onClick={() => flyOut('nope')}>
+          <X size={26} />
+        </button>
+        <button
+          className="action-btn action-btn--like"
+          onClick={() => flyOut('like')}
+        >
+          <Heart size={28} fill="white" />
+        </button>
+      </div>
     </div>
   )
 }
