@@ -52,36 +52,21 @@ def _validate_telegram_init_data(init_data: str) -> dict | None:
         return None
 
 
-def _get_or_create_user(
-    db: Session,
-    *,
-    user_id: str,
-    telegram_id: int | None = None,
-    username: str | None = None,
-    first_name: str | None = None,
-) -> User:
-    from datetime import datetime
-
-    user = db.get(User, user_id)
-    if user:
-        user.last_seen_at = datetime.utcnow()
-        if username:
-            user.username = username
-        if first_name:
-            user.first_name = first_name
+def _get_or_create_user(db: Session, telegram_id: int, user_data: dict) -> User:
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        user = User(
+            # id не передаём!
+            telegram_id=telegram_id,
+            username=user_data.get('username'),
+            first_name=user_data.get('first_name', ''),
+            last_name=user_data.get('last_name'),
+            photo_url=user_data.get('photo_url')
+        )
+        db.add(user)
         db.commit()
-        return user
-    user = User(
-        id=user_id,
-        telegram_id=telegram_id,
-        username=username,
-        first_name=first_name or "Гость",
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+        db.refresh(user)
     return user
-
 
 async def get_current_user(
     x_init_data: str | None = Header(default=None, alias="X-Init-Data"),

@@ -23,12 +23,16 @@ def gen_ref_code() -> str:
 # ─────────────────────────────────────────────────────────────────────────
 class User(Base):
     __tablename__ = "users"
-
-    id = Column(String, primary_key=True)  # telegram_id как строка, либо анонимный uuid
-    telegram_id = Column(BigInteger, nullable=True, unique=True, index=True)    
+    id = Column(Integer, primary_key=True, index=True)  # автоинкремент
+    telegram_id = Column(BigInteger, unique=True, index=True, nullable=False)  # BIGINT
     username = Column(String, nullable=True)
-    first_name = Column(String, default="Гость")
-    is_admin = Column(Boolean, default=False)
+    first_name = Column(String)
+    last_name = Column(String, nullable=True)
+    photo_url = Column(String, nullable=True)
+    is_premium = Column(Boolean, default=False)
+    stars_balance = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Онбординг / предпочтения
     onboarding_done = Column(Boolean, default=False)
