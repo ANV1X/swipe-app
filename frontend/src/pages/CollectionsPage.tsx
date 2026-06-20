@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, ChevronRight, ArrowLeft, Check } from 'lucide-react'
+import { Plus, Search, ChevronRight, ArrowLeft, Check, X } from 'lucide-react'
 import {
   fetchCollections, fetchCollectionItems, createCollection,
   subscribeCollection, unsubscribeCollection,
-  formatPrice, CollectionData, Product,
+  addCollectionItem, removeCollectionItem, fetchWishlist, fetchMe,
+  formatPrice, CollectionData, Product, WishlistItem,
 } from '../api/client'
 import { useToast } from '../components/Toast'
 
@@ -14,14 +15,86 @@ function formatSubs(n: number) {
 
 type DetailProps = { collection: CollectionData; onBack: () => void; onChange: (c: CollectionData) => void }
 
+function AddItemModal({ collectionId, existingIds, onClose, onAdded }: {
+  collectionId: string; existingIds: Set<string>; onClose: () => void; onAdded: (items: Product[]) => void
+}) {
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([])
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const { show, node } = useToast()
+
+  useEffect(() => { fetchWishlist().then(setWishlist).catch(console.error) }, [])
+
+  async function addItem(productId: string) {
+    setBusyId(productId)
+    try {
+      const items = await addCollectionItem(collectionId, productId)
+      onAdded(items)
+      show('Добавлено в коллекцию')
+    } catch (e) {
+      console.error('add collection item failed', e)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const available = wishlist.filter(w => !existingIds.has(w.product_id))
+
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      {node}
+      <div className="modal-sheet">
+        <div className="modal-handle" />
+        <div className="modal-header">
+          <h3 className="modal-title">Добавить товар</h3>
+          <button className="modal-close" onClick={onClose}><X size={14} /></button>
+        </div>
+        <div className="modal-body" style={{ padding: '4px 16px 20px' }}>
+          {available.length === 0 ? (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text2)', fontSize: 14 }}>
+              {wishlist.length === 0
+                ? 'Сначала сохраните что-то в вишлист — оттуда можно добавлять товары в коллекцию'
+                : 'Все товары из вашего вишлиста уже в этой коллекции'}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {available.map(w => (
+                <div
+                  key={w.product_id}
+                  onClick={() => !busyId && addItem(w.product_id)}
+                  style={{
+                    background: 'var(--surface2)', borderRadius: 14, overflow: 'hidden',
+                    cursor: 'pointer', opacity: busyId === w.product_id ? 0.5 : 1,
+                  }}
+                >
+                  <img src={w.image_url || ''} alt={w.title} style={{
+                    width: '100%', aspectRatio: '3/4', objectFit: 'cover', objectPosition: 'top', display: 'block'
+                  }} />
+                  <div style={{ padding: '6px 8px', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                    {formatPrice(w.price)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CollectionDetail({ collection, onBack, onChange }: DetailProps) {
   const [items, setItems] = useState<Product[]>([])
   const [busy, setBusy] = useState(false)
+  const [myUserId, setMyUserId] = useState('')
+  const [showAddItem, setShowAddItem] = useState(false)
   const { show, node } = useToast()
 
   useEffect(() => {
     fetchCollectionItems(collection.id).then(setItems).catch(console.error)
+    fetchMe().then(me => setMyUserId(me.id)).catch(console.error)
   }, [collection.id])
+
+  const isAuthor = !!myUserId && myUserId === collection.author_id
 
   async function handleSubscribe() {
     setBusy(true)
@@ -38,17 +111,39 @@ function CollectionDetail({ collection, onBack, onChange }: DetailProps) {
     }
   }
 
+  async function handleRemoveItem(productId: string) {
+    try {
+      const updatedItems = await removeCollectionItem(collection.id, productId)
+      setItems(updatedItems)
+      show('Товар удалён из коллекции')
+    } catch (e) {
+      console.error('remove collection item failed', e)
+    }
+  }
+
   const initials = collection.author_name.slice(0, 2).toUpperCase()
 
   return (
     <div className="page-bg">
       {node}
+      {showAddItem && (
+        <AddItemModal
+          collectionId={collection.id}
+          existingIds={new Set(items.map(i => i.id))}
+          onClose={() => setShowAddItem(false)}
+          onAdded={setItems}
+        />
+      )}
       <div className="page-header">
         <button className="back-btn" onClick={onBack}><ArrowLeft size={18} /></button>
         <div style={{ flex: 1, textAlign: 'center' }}>
           <div style={{ fontSize: 17, fontWeight: 700 }}>{collection.name}</div>
         </div>
-        <div style={{ width: 36 }} />
+        {isAuthor ? (
+          <button className="header-action-btn" onClick={() => setShowAddItem(true)}><Plus size={20} /></button>
+        ) : (
+          <div style={{ width: 36 }} />
+        )}
       </div>
 
       <div className="collection-detail-hero">
@@ -71,18 +166,38 @@ function CollectionDetail({ collection, onBack, onChange }: DetailProps) {
           : 'Подписаться'}
       </button>
 
-      <div className="collection-grid">
-        {items.map(item => (
-          <div key={item.id} className="collection-grid-item">
-            <img
-              className="collection-grid-item__img"
-              src={item.image_url || ''}
-              alt={item.title}
-            />
-            <div className="collection-grid-item__price">{formatPrice(item.price)}</div>
+      {items.length === 0 ? (
+        <div className="page-center" style={{ minHeight: '20vh' }}>
+          <div style={{ fontSize: 14, color: 'var(--text2)' }}>
+            {isAuthor ? 'Добавьте первый товар в коллекцию' : 'В коллекции пока нет товаров'}
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className="collection-grid">
+          {items.map(item => (
+            <div key={item.id} className="collection-grid-item" style={{ position: 'relative' }}>
+              <img
+                className="collection-grid-item__img"
+                src={item.image_url || ''}
+                alt={item.title}
+              />
+              <div className="collection-grid-item__price">{formatPrice(item.price)}</div>
+              {isAuthor && (
+                <button
+                  onClick={() => handleRemoveItem(item.id)}
+                  style={{
+                    position: 'absolute', top: 6, right: 6, width: 24, height: 24, borderRadius: '50%',
+                    border: 'none', background: 'rgba(0,0,0,0.55)', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

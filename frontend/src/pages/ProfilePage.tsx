@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Settings, Clock, Layers, SlidersHorizontal, ChevronRight, Bell, Shield } from 'lucide-react'
+import { Settings, Clock, Layers, SlidersHorizontal, ChevronRight, Bell, Shield, Users, Flame } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import NotificationsSheet from '../components/NotificationsSheet'
 import { useToast } from '../components/Toast'
@@ -9,6 +9,7 @@ import { fetchProfile, fetchUnreadCount, ProfileData } from '../api/client'
 export default function ProfilePage() {
   const [showNotifs, setShowNotifs] = useState(false)
   const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [loading, setLoading] = useState(true)
   const [unread, setUnread] = useState(0)
   const navigate = useNavigate()
   const { node } = useToast()
@@ -17,11 +18,12 @@ export default function ProfilePage() {
   useEffect(() => { load() }, [])
 
   function load() {
-    fetchProfile().then(setProfile).catch(console.error)
+    setLoading(true)
+    fetchProfile().then(setProfile).catch(console.error).finally(() => setLoading(false))
     fetchUnreadCount().then(r => setUnread(r.count)).catch(console.error)
   }
 
-  const initial = (profile?.first_name || 'Г').slice(0, 1).toUpperCase()
+  const initial = profile ? (profile.first_name || '?').slice(0, 1).toUpperCase() : ''
 
   return (
     <div className="page-bg" style={{ paddingBottom: 16 }}>
@@ -35,10 +37,23 @@ export default function ProfilePage() {
 
       <div className="profile-header">
         <div className="profile-user-row">
-          <div className="profile-avatar">{initial}</div>
+          <div className="profile-avatar">
+            {loading ? <span className="skeleton-bar" style={{ width: 28, height: 28, borderRadius: '50%' }} /> : initial}
+          </div>
           <div>
-            <div className="profile-name">{profile?.first_name || 'Гость'}</div>
-            <div className="profile-handle">{profile?.username ? `@${profile.username}` : `с нами с ${profile ? new Date(profile.member_since).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) : '...'}`}</div>
+            {loading ? (
+              <>
+                <div className="skeleton-bar" style={{ width: 110, height: 16, marginBottom: 6 }} />
+                <div className="skeleton-bar" style={{ width: 80, height: 12 }} />
+              </>
+            ) : (
+              <>
+                <div className="profile-name">{profile?.first_name || 'Гость'}</div>
+                <div className="profile-handle">
+                  {profile?.username ? `@${profile.username}` : `с нами с ${profile ? new Date(profile.member_since).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) : ''}`}
+                </div>
+              </>
+            )}
           </div>
         </div>
         <button className="profile-settings-btn" onClick={() => navigate('/settings')}>
@@ -91,6 +106,20 @@ export default function ProfilePage() {
           )}
           <ChevronRight size={16} className="profile-menu-arrow" />
         </div>
+        <div className="profile-menu-item" onClick={() => navigate('/friends')}>
+          <div className="profile-menu-icon" style={{ background: 'rgba(108,78,242,0.10)', color: 'var(--accent)' }}>
+            <Users size={18} />
+          </div>
+          <div className="profile-menu-label">Друзья</div>
+          <ChevronRight size={16} className="profile-menu-arrow" />
+        </div>
+        <div className="profile-menu-item" onClick={() => navigate('/deals')}>
+          <div className="profile-menu-icon" style={{ background: 'rgba(255,69,58,0.10)', color: 'var(--orange)' }}>
+            <Flame size={18} />
+          </div>
+          <div className="profile-menu-label">Скидки</div>
+          <ChevronRight size={16} className="profile-menu-arrow" />
+        </div>
         <div className="profile-menu-item" onClick={() => navigate('/history')}>
           <div className="profile-menu-icon" style={{ background: 'rgba(255,159,10,0.12)', color: 'var(--orange)' }}>
             <Clock size={18} />
@@ -120,13 +149,15 @@ export default function ProfilePage() {
           </div>
           <ChevronRight size={16} className="profile-menu-arrow" />
         </div>
-        <div className="profile-menu-item" onClick={() => navigate('/admin')}>
-          <div className="profile-menu-icon" style={{ background: 'rgba(255,159,10,0.12)', color: 'var(--orange)' }}>
-            <Shield size={18} />
+        {profile?.is_admin && (
+          <div className="profile-menu-item" onClick={() => navigate('/admin')}>
+            <div className="profile-menu-icon" style={{ background: 'rgba(255,159,10,0.12)', color: 'var(--orange)' }}>
+              <Shield size={18} />
+            </div>
+            <div className="profile-menu-label">Админ панель</div>
+            <ChevronRight size={16} className="profile-menu-arrow" />
           </div>
-          <div className="profile-menu-label">Админ панель</div>
-          <ChevronRight size={16} className="profile-menu-arrow" />
-        </div>
+        )}
       </div>
     </div>
   )

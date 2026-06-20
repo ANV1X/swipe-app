@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.auth import get_current_user
+from app.auth import get_current_user, is_admin_user
 from app.models import Swipe, Wishlist, Product, User, Friend, Referral
 from app.schemas import ProfileOut, AchievementOut
 
@@ -75,6 +75,7 @@ def get_profile(db: Session = Depends(get_db), user: User = Depends(get_current_
 
     return ProfileOut(
         user_id=user.id, first_name=user.first_name, username=user.username,
+        is_admin=is_admin_user(user),
         total_swipes=total_swipes, likes=likes, dislikes=dislikes,
         wishlist_count=wishlist_count, fav_category=fav_category, fav_marketplace=fav_marketplace,
         member_since=user.created_at, referral_code=user.referral_code,

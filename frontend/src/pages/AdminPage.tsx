@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   fetchAdminStats, exportAdminUsers, exportAdminSwipes, exportAdminBattles, exportAdminAll,
-  createBattle, createCollection, fetchProducts, Product as ApiProduct,
+  createBattle, createCollection, fetchProducts, fetchMe, Product as ApiProduct,
 } from '../api/client'
 import {
   Users, Heart, Bookmark, Swords, Share2, Download, FileText,
@@ -25,9 +25,17 @@ export default function AdminPage() {
   const [showCreateBattle, setShowCreateBattle] = useState(false)
   const [showCreateCollection, setShowCreateCollection] = useState(false)
   const [expandedSection, setExpandedSection] = useState<string | null>('users')
+  const [checkingAccess, setCheckingAccess] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
-    loadStats()
+    fetchMe()
+      .then(me => {
+        setIsAdmin(me.is_admin)
+        if (me.is_admin) loadStats()
+      })
+      .catch(() => setIsAdmin(false))
+      .finally(() => setCheckingAccess(false))
   }, [])
 
   async function loadStats() {
@@ -101,6 +109,25 @@ export default function AdminPage() {
   }
 
   const getStat = (section: keyof Stats, key: string): number => stats?.[section]?.[key] ?? 0
+
+  if (checkingAccess) {
+    return (
+      <div className="page-center" style={{ height: '100vh' }}><div className="spinner" /></div>
+    )
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="page-center" style={{ height: '100vh', gap: 12, padding: '0 32px', textAlign: 'center' }}>
+        <Shield size={40} color="var(--text3)" />
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Доступ ограничен</div>
+        <div style={{ fontSize: 13, color: 'var(--text2)' }}>Эта страница доступна только администраторам</div>
+        <a href="/" className="btn-primary" style={{ width: 'auto', padding: '12px 24px', marginTop: 8, textDecoration: 'none', display: 'inline-block' }}>
+          На главную
+        </a>
+      </div>
+    )
+  }
 
   return (
     <div className="admin-page">

@@ -43,6 +43,7 @@ export function useTelegram() {
     user: { id: 0, first_name: 'User' },
     isDark: false,
   })
+  const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
     const init = () => {
@@ -55,15 +56,20 @@ export function useTelegram() {
           user: tg.initDataUnsafe?.user ?? { id: 0, first_name: 'User' },
           isDark: tg.colorScheme === 'dark',
         })
-        console.log('TG OK, initData length:', tg.initData?.length)
-      } else {
-        console.log('No Telegram.WebApp after timeout')
       }
+      setIsReady(true)
     }
 
-    // Даём 500ms на загрузку telegram-web-app.js
-    const timer = setTimeout(init, 500)
-    return () => clearTimeout(timer)
+    // telegram-web-app.js подключается тегом <script> в index.html и обычно
+    // готов сразу, но даём небольшой запас на случай медленной загрузки —
+    // и не отправляем сетевые запросы как анонимный гость, пока не убедимся,
+    // что мы (не) внутри Telegram, чтобы не было "мигания" гостя на проде.
+    if (window.Telegram?.WebApp) {
+      init()
+    } else {
+      const timer = setTimeout(init, 350)
+      return () => clearTimeout(timer)
+    }
   }, [])
 
   const haptic = (style: 'light' | 'medium' | 'heavy' = 'light') => {
@@ -75,6 +81,7 @@ export function useTelegram() {
     user: tgData.user,
     initData: tgData.initData,
     isDark: tgData.isDark,
+    isReady,
     haptic,
   }
 }

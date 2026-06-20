@@ -13,7 +13,8 @@ router = APIRouter(prefix="/collections", tags=["collections"])
 
 def _to_out(c: Collection, items_count: int, is_subscribed: bool) -> CollectionOut:
     return CollectionOut(
-        id=c.id, name=c.name, author_name=c.author_name, author_handle=c.author_handle,
+        id=c.id, name=c.name, author_id=c.author_id, author_name=c.author_name,
+        author_handle=c.author_handle,
         author_avatar=c.author_avatar, cover_image=c.cover_image,
         subscribers_count=c.subscribers_count, items_count=items_count,
         is_subscribed=is_subscribed, created_at=c.created_at,
@@ -57,6 +58,76 @@ def collection_items(collection_id: str, db: Session = Depends(get_db)):
     rows = db.execute(
         select(Product)
         .join(CollectionItem, CollectionItem.product_id == Product.id)
+        .where(CollectionItem.collection_id == collection_id)
+    ).scalars().all()
+    return [product_to_out(p) for p in rows]
+
+
+@router.post("/{collection_id}/items/{product_id}", response_model=list[ProductOut])
+def add_collection_item(
+    collection_id: str, product_id: str,
+    db: Session = Depends(get_db), user: User = Depends(get_current_user),
+):
+    c = db.get(Collection, collection_id)
+    if not c:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    if c.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the collection author can add items")
+    product = db.get(Product, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    existing = db.scalar(
+        select(CollectionItem).where(
+            CollectionItem.collection_id == collection_id, CollectionItem.product_id == product_id
+        )
+    )
+    if not existing:
+        db.add(CollectionItem(collection_id=collection_id, product_id=product_id))
+
+        # Уведомляем подписчиков о новом товаре в коллекции
+        subscribers = db.scalars(
+            select(CollectionSubscription).where(CollectionSubscription.collection_id == collection_id)
+        ).all()
+        for sub in subscribers:
+            subscriber = db.get(User, sub.user_id)
+            if subscriber and subscriber.notif_new_in_collection:
+                db.add(Notification(
+                    user_id=subscriber.id, type="new_in_collection", product_id=product.id,
+                    title="Новинка в коллекции",
+                    body=f"В «{c.name}» добавили: {product.title}",
+                ))
+        db.commit()
+
+    rows = db.execute(
+        select(Product).join(CollectionItem, CollectionItem.product_id == Product.id)
+        .where(CollectionItem.collection_id == collection_id)
+    ).scalars().all()
+    return [product_to_out(p) for p in rows]
+
+
+@router.delete("/{collection_id}/items/{product_id}", response_model=list[ProductOut])
+def remove_collection_item(
+    collection_id: str, product_id: str,
+    db: Session = Depends(get_db), user: User = Depends(get_current_user),
+):
+    c = db.get(Collection, collection_id)
+    if not c:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    if c.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the collection author can remove items")
+
+    item = db.scalar(
+        select(CollectionItem).where(
+            CollectionItem.collection_id == collection_id, CollectionItem.product_id == product_id
+        )
+    )
+    if item:
+        db.delete(item)
+        db.commit()
+
+    rows = db.execute(
+        select(Product).join(CollectionItem, CollectionItem.product_id == Product.id)
         .where(CollectionItem.collection_id == collection_id)
     ).scalars().all()
     return [product_to_out(p) for p in rows]

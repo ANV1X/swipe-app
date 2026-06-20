@@ -109,10 +109,11 @@ async def get_current_user(
     return _get_or_create_user(db, user_id="guest", first_name="Гость")
 
 
+def is_admin_user(user: User) -> bool:
+    return bool(user.is_admin) or (user.telegram_id is not None and user.telegram_id in Config.ADMIN_IDS)
+
+
 def require_admin(user: User = Depends(get_current_user)) -> User:
-    if not Config.ADMIN_IDS:
-        # Если список админов не задан — считаем демо-режимом, доступ открыт
-        return user
-    if user.telegram_id in Config.ADMIN_IDS or user.is_admin:
+    if is_admin_user(user):
         return user
     raise HTTPException(status_code=403, detail="Admin access required")

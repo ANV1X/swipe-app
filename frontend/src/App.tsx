@@ -28,7 +28,7 @@ function NavIcon({ d }: { d: React.ReactNode }) {
 }
 
 function AppShell() {
-  const { initData } = useTelegram()
+  const { initData, isReady } = useTelegram()
   const [unreadCount, setUnreadCount] = useState(0)
   const [onboardingDone, setOnboardingDone] = useState<boolean>(
     () => Boolean(localStorage.getItem('onboarding_done'))
@@ -40,8 +40,12 @@ function AppShell() {
     if (initData) setInitData(initData)
   }, [initData])
 
-  // Синхронизируемся с backend: онбординг и реферальный код
+  // Синхронизируемся с backend: онбординг и реферальный код.
+  // Ждём isReady, чтобы не успеть отправить запрос как анонимный гость
+  // за миг до того, как подключится настоящий Telegram-пользователь —
+  // иначе в профиле на секунду мелькнёт "Гость".
   useEffect(() => {
+    if (!isReady) return
     fetchMe()
       .then(me => {
         if (me.onboarding_done) {
@@ -64,14 +68,15 @@ function AppShell() {
       })
       .catch(() => {})
       .finally(() => setCheckingUser(false))
-  }, [initData])
+  }, [isReady])
 
   useEffect(() => {
+    if (!isReady) return
     const load = () => fetchUnreadCount().then(r => setUnreadCount(r.count)).catch(() => {})
     load()
     const interval = setInterval(load, 20000)
     return () => clearInterval(interval)
-  }, [])
+  }, [isReady])
 
   if (!onboardingDone) {
     return (
@@ -81,7 +86,7 @@ function AppShell() {
     )
   }
 
-  if (checkingUser) {
+  if (!isReady || checkingUser) {
     return (
       <div className="app">
         <div className="page-center" style={{ height: '100vh' }}><div className="spinner" /></div>

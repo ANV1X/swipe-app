@@ -86,6 +86,7 @@ class WishlistNotifyUpdate(BaseModel):
 class CollectionOut(BaseModel):
     id: str
     name: str
+    author_id: str | None
     author_name: str
     author_handle: str | None
     author_avatar: str | None
@@ -204,6 +205,7 @@ class ProfileOut(BaseModel):
     user_id: str
     first_name: str
     username: str | None
+    is_admin: bool
     total_swipes: int
     likes: int
     dislikes: int
@@ -222,6 +224,7 @@ class UserOut(BaseModel):
     telegram_id: int | None
     username: str | None
     first_name: str
+    is_admin: bool
     onboarding_done: bool
     pref_gender: str | None
     pref_styles: list[str]

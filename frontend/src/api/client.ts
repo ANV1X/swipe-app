@@ -61,6 +61,7 @@ export interface Achievement {
 
 export interface ProfileData {
   user_id: string; first_name: string; username: string | null
+  is_admin: boolean
   total_swipes: number; likes: number; dislikes: number
   wishlist_count: number; fav_category: string | null
   fav_marketplace: string | null; member_since: string
@@ -75,7 +76,7 @@ export interface SwipeHistoryItem {
 }
 
 export interface CollectionData {
-  id: string; name: string; author_name: string; author_handle: string | null
+  id: string; name: string; author_id: string | null; author_name: string; author_handle: string | null
   author_avatar: string | null; cover_image: string | null
   subscribers_count: number; items_count: number; is_subscribed: boolean
   created_at: string
@@ -112,6 +113,7 @@ export interface SharedWishlistData {
 
 export interface UserData {
   id: string; telegram_id: number | null; username: string | null; first_name: string
+  is_admin: boolean
   onboarding_done: boolean; pref_gender: string | null
   pref_styles: string[]; pref_colors: string[]; pref_brands: string[]
   pref_budget: string | null
@@ -120,7 +122,7 @@ export interface UserData {
   referral_code: string
 }
 
-export type UserUpdate = Partial<Omit<UserData, 'id' | 'telegram_id' | 'username' | 'referral_code'>>
+export type UserUpdate = Partial<Omit<UserData, 'id' | 'telegram_id' | 'username' | 'referral_code' | 'is_admin'>>
 
 // ─── Products ──────────────────────────────────────────────────────────
 export async function fetchProducts(p?: {
@@ -200,6 +202,14 @@ export async function subscribeCollection(id: string): Promise<CollectionData> {
 
 export async function unsubscribeCollection(id: string): Promise<CollectionData> {
   return request(`/collections/${id}/subscribe`, { method: 'DELETE' })
+}
+
+export async function addCollectionItem(collectionId: string, productId: string): Promise<Product[]> {
+  return request(`/collections/${collectionId}/items/${productId}`, { method: 'POST' })
+}
+
+export async function removeCollectionItem(collectionId: string, productId: string): Promise<Product[]> {
+  return request(`/collections/${collectionId}/items/${productId}`, { method: 'DELETE' })
 }
 
 // ─── Battles ───────────────────────────────────────────────────────────
