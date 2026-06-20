@@ -6,7 +6,7 @@ from sqlalchemy import (
     Column, String, Integer, Boolean, DateTime, ForeignKey, Text, UniqueConstraint, BigInteger
 )
 from sqlalchemy.orm import relationship
-
+from sqlalchemy.sql import func
 from app.database import Base
 
 
