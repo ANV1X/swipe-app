@@ -1,25 +1,12 @@
-import { useEffect, useState } from 'react'
-import { formatPrice } from '../api/client'
-
-interface Point { date: string; price: number }
-interface PriceHistoryData {
-  product_id: string
-  current_price: number
-  min_price: number
-  max_price: number
-  points: Point[]
-}
+import { useState } from 'react'
+import { formatPrice, fetchPriceHistory, PriceHistoryData, PricePoint } from '../api/client'
 
 interface Props {
   product_id: string
   current_price: number
 }
 
-const BASE_URL = 'http://localhost:8000'
-let _initData = ''
-export function setPriceChartInitData(d: string) { _initData = d }
-
-export default function PriceChart({ product_id, current_price }: Props) {
+export default function PriceChart({ product_id }: Props) {
   const [data, setData] = useState<PriceHistoryData | null>(null)
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
@@ -29,16 +16,16 @@ export default function PriceChart({ product_id, current_price }: Props) {
     setLoading(true)
     setOpen(true)
     try {
-      const res = await fetch(`${BASE_URL}/wishlist/${product_id}/price-history`, {
-        headers: { 'Content-Type': 'application/json', 'X-Init-Data': _initData }
-      })
-      if (res.ok) setData(await res.json())
+      const result = await fetchPriceHistory(product_id)
+      setData(result)
+    } catch (e) {
+      console.error('fetch price history failed', e)
     } finally {
       setLoading(false)
     }
   }
 
-  const renderChart = (points: Point[], min: number, max: number) => {
+  const renderChart = (points: PricePoint[], min: number, max: number) => {
     if (points.length < 2) return null
     const W = 280, H = 64, pad = 8
     const range = max - min || 1

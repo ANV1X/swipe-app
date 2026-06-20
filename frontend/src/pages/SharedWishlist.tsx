@@ -3,10 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   fetchSharedWishlists, createSharedWishlist, joinSharedWishlist,
   addToSharedWishlist, removeFromSharedWishlist,
-  fetchWishlist, SharedWishlistData, WishlistItem,
+  fetchWishlist, fetchMe, SharedWishlistData, WishlistItem,
   formatPrice, marketplaceLabel
 } from '../api/client'
-import { useTelegram } from '../hooks/useTelegram'
 
 // ─── Список совместных вишлистов ─────────────────────────────────────────────
 export function SharedWishlistList() {
@@ -180,7 +179,6 @@ function ItemPickerModal({
 // ─── Детальная страница совместного вишлиста ──────────────────────────────────
 export function SharedWishlistDetail() {
   const { id } = useParams<{ id: string }>()
-  const { user } = useTelegram()
   const navigate = useNavigate()
 
   const [sw, setSw] = useState<SharedWishlistData | null>(null)
@@ -188,13 +186,15 @@ export function SharedWishlistDetail() {
   const [myItems, setMyItems] = useState<WishlistItem[]>([])
   const [showPicker, setShowPicker] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [myUserId, setMyUserId] = useState('')
 
   useEffect(() => {
     if (!id) return
-    Promise.all([joinSharedWishlist(id), fetchWishlist()])
-      .then(([sharedData, myWishlist]) => {
+    Promise.all([joinSharedWishlist(id), fetchWishlist(), fetchMe()])
+      .then(([sharedData, myWishlist, me]) => {
         setSw(sharedData)
         setMyItems(myWishlist)
+        setMyUserId(me.id)
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -225,7 +225,6 @@ export function SharedWishlistDetail() {
   if (loading) return <div className="page-center"><div className="spinner" /></div>
   if (!sw) return <div className="page-center"><p>Вишлист не найден</p></div>
 
-  const myUserId = String(user?.id ?? '')
   const alreadyIn = new Set(sw.items.map(i => i.product_id))
   const canAddMore = myItems.some(i => !alreadyIn.has(i.product_id))
 

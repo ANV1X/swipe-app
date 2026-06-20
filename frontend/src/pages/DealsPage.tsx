@@ -1,49 +1,65 @@
 import { useEffect, useState } from 'react'
 import { Flame, Heart, Clock, ExternalLink } from 'lucide-react'
-import { supabase, Product, getAnonId } from '../lib/supabase'
+import {
+  fetchDeals, fetchWishlist, addToWishlist, removeFromWishlist,
+  formatPrice, Deal,
+} from '../api/client'
 import { useToast } from '../components/Toast'
 
 const CATEGORIES = ['Для вас', 'Одежда', 'Обувь', 'Аксессуары']
 
-function formatPrice(p: number) {
-  return p.toLocaleString('ru-RU') + ' ₽'
-}
-
 export default function DealsPage() {
-  const [deals, setDeals] = useState<Product[]>([])
+  const [deals, setDeals] = useState<Deal[]>([])
   const [category, setCategory] = useState('Для вас')
   const [saved, setSaved] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const { show, node } = useToast()
-  const userId = getAnonId()
 
   useEffect(() => { loadDeals() }, [category])
   useEffect(() => { loadWishlist() }, [])
 
   async function loadDeals() {
     setLoading(true)
-    let q = supabase.from('products').select('*').not('discount_pct', 'is', null).order('discount_pct', { ascending: false })
-    if (category !== 'Для вас') q = q.eq('category', category)
-    const { data } = await q
-    setDeals(data || [])
-    setLoading(false)
+    try {
+      const data = await fetchDeals({
+        for_you: category === 'Для вас',
+        category: category !== 'Для вас' ? category : undefined,
+      })
+      setDeals(data)
+    } catch (e) {
+      console.error('load deals failed', e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function loadWishlist() {
-    const { data } = await supabase.from('wishlist').select('product_id').eq('user_id', userId)
-    setSaved(new Set(data?.map((d: any) => d.product_id) || []))
+    try {
+      const data = await fetchWishlist()
+      setSaved(new Set(data.map(d => d.product_id)))
+    } catch (e) {
+      console.error('load wishlist failed', e)
+    }
   }
 
-  async function toggleSave(p: Product) {
-    if (saved.has(p.id)) {
-      await supabase.from('wishlist').delete().eq('user_id', userId).eq('product_id', p.id)
-      setSaved(s => { const n = new Set(s); n.delete(p.id); return n })
-      show('Удалено из вишлиста')
-    } else {
-      await supabase.from('wishlist').upsert({ user_id: userId, product_id: p.id })
-      setSaved(s => new Set([...s, p.id]))
-      show('Сохранено в вишлист')
+  async function toggleSave(p: Deal) {
+    try {
+      if (saved.has(p.id)) {
+        await removeFromWishlist(p.id)
+        setSaved(s => { const n = new Set(s); n.delete(p.id); return n })
+        show('Удалено из вишлиста')
+      } else {
+        await addToWishlist(p.id)
+        setSaved(s => new Set([...s, p.id]))
+        show('Сохранено в вишлист')
+      }
+    } catch (e) {
+      console.error('toggle save failed', e)
     }
+  }
+
+  function buyDeal(p: Deal) {
+    window.open(p.external_url, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -88,7 +104,7 @@ export default function DealsPage() {
                   <Heart size={16} fill={saved.has(p.id) ? 'currentColor' : 'none'} />
                 </button>
                 <div className="deal-timer-badge">
-                  <Clock size={11} /> Осталось 6 ч
+                  <Clock size={11} /> Горячая скидка
                 </div>
               </div>
               <div className="deal-card__info">
@@ -98,7 +114,11 @@ export default function DealsPage() {
                   <span className="deal-card__price">{formatPrice(p.price)}</span>
                   {p.price_old && <span className="deal-card__price-old">{formatPrice(p.price_old)}</span>}
                 </div>
-                <button className="deal-card__buy-btn" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <button
+                  className="deal-card__buy-btn"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                  onClick={() => buyDeal(p)}
+                >
                   <ExternalLink size={16} /> Купить за {formatPrice(p.price)}
                 </button>
               </div>

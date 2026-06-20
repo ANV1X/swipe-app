@@ -1,18 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Heart, X, Bookmark } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, Product, getAnonId } from '../lib/supabase'
-
-type SwipeRecord = {
-  id: string
-  direction: 'like' | 'nope' | 'save'
-  created_at: string
-  products: Product
-}
-
-function formatPrice(p: number) {
-  return p.toLocaleString('ru-RU') + ' ₽'
-}
+import { fetchHistory, formatPrice, SwipeHistoryItem } from '../api/client'
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -24,22 +13,15 @@ function timeAgo(dateStr: string) {
 }
 
 export default function HistoryPage() {
-  const [history, setHistory] = useState<SwipeRecord[]>([])
+  const [history, setHistory] = useState<SwipeHistoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
-  const userId = getAnonId()
 
   useEffect(() => {
-    supabase
-      .from('swipes')
-      .select('*, products(*)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(50)
-      .then(({ data }) => {
-        setHistory((data || []) as SwipeRecord[])
-        setLoading(false)
-      })
+    fetchHistory(undefined, 50)
+      .then(setHistory)
+      .catch(console.error)
+      .finally(() => setLoading(false))
   }, [])
 
   const likes = history.filter(h => h.direction === 'like')
@@ -77,52 +59,48 @@ export default function HistoryPage() {
         </div>
       ) : (
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {history.map(h => {
-            const p = h.products
-            if (!p) return null
-            return (
-              <div key={h.id} style={{
-                display: 'flex',
-                gap: 12,
-                background: 'var(--surface)',
-                borderRadius: 16,
-                padding: 12,
-                alignItems: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-              }}>
-                <img src={p.image_url || ''} alt={p.title} style={{
-                  width: 56,
-                  height: 70,
-                  borderRadius: 10,
-                  objectFit: 'cover',
-                  objectPosition: 'top',
-                  background: 'var(--surface2)',
-                  flexShrink: 0
-                }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{p.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>{p.brand || p.marketplace}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{formatPrice(p.price)}</div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <div style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: '50%',
-                    background: h.direction === 'like' ? 'rgba(52,199,89,0.12)' : h.direction === 'save' ? 'var(--accent-light)' : 'var(--red-light)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    {h.direction === 'like' && <Heart size={14} color="var(--green)" />}
-                    {h.direction === 'nope' && <X size={14} color="var(--red)" />}
-                    {h.direction === 'save' && <Bookmark size={14} color="var(--accent)" />}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)' }}>{timeAgo(h.created_at)}</div>
-                </div>
+          {history.map(h => (
+            <div key={h.id} style={{
+              display: 'flex',
+              gap: 12,
+              background: 'var(--surface)',
+              borderRadius: 16,
+              padding: 12,
+              alignItems: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <img src={h.image_url || ''} alt={h.title} style={{
+                width: 56,
+                height: 70,
+                borderRadius: 10,
+                objectFit: 'cover',
+                objectPosition: 'top',
+                background: 'var(--surface2)',
+                flexShrink: 0
+              }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{h.title}</div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>{h.brand || h.marketplace}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{formatPrice(h.price)}</div>
               </div>
-            )
-          })}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: '50%',
+                  background: h.direction === 'like' ? 'rgba(52,199,89,0.12)' : h.direction === 'save' ? 'var(--accent-light)' : 'var(--red-light)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  {h.direction === 'like' && <Heart size={14} color="var(--green)" />}
+                  {h.direction === 'nope' && <X size={14} color="var(--red)" />}
+                  {h.direction === 'save' && <Bookmark size={14} color="var(--accent)" />}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text3)' }}>{timeAgo(h.created_at)}</div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

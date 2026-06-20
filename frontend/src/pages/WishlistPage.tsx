@@ -1,60 +1,65 @@
 import { useEffect, useState } from 'react'
 import { Bell, BellOff, ExternalLink, Trash2, ShoppingBag } from 'lucide-react'
-import { supabase, Product, getAnonId } from '../lib/supabase'
+import {
+  fetchWishlist, removeFromWishlist, updateWishlistNotify,
+  formatPrice, marketplaceLabel, WishlistItem,
+} from '../api/client'
 import { useToast } from '../components/Toast'
+import PriceChart from '../components/PriceChart'
 
 const CATEGORIES = ['Все', 'Одежда', 'Обувь', 'Аксессуары']
 
-function formatPrice(p: number) {
-  return p.toLocaleString('ru-RU') + ' ₽'
-}
-
-type WishItem = {
-  id: string
-  product_id: string
-  notify_price_drop: boolean
-  products: Product
-}
-
 export default function WishlistPage() {
-  const [items, setItems] = useState<WishItem[]>([])
+  const [items, setItems] = useState<WishlistItem[]>([])
   const [category, setCategory] = useState('Все')
   const [loading, setLoading] = useState(true)
   const { show, node } = useToast()
-  const userId = getAnonId()
 
   useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase
-      .from('wishlist')
-      .select('*, products(*)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-    setItems((data || []) as WishItem[])
-    setLoading(false)
+    try {
+      const data = await fetchWishlist()
+      setItems(data)
+    } catch (e) {
+      console.error('load wishlist failed', e)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  async function removeItem(id: string) {
-    await supabase.from('wishlist').delete().eq('id', id)
-    setItems(prev => prev.filter(i => i.id !== id))
-    show('Удалено из вишлиста')
+  async function removeItem(item: WishlistItem) {
+    try {
+      await removeFromWishlist(item.product_id)
+      setItems(prev => prev.filter(i => i.id !== item.id))
+      show('Удалено из вишлиста')
+    } catch (e) {
+      console.error('remove failed', e)
+    }
   }
 
-  async function toggleNotify(item: WishItem) {
+  async function toggleNotify(item: WishlistItem) {
     const newVal = !item.notify_price_drop
-    await supabase.from('wishlist').update({ notify_price_drop: newVal }).eq('id', item.id)
-    setItems(prev => prev.map(i => i.id === item.id ? { ...i, notify_price_drop: newVal } : i))
-    show(newVal ? 'Уведомления о скидке включены' : 'Уведомления отключены')
+    try {
+      await updateWishlistNotify(item.product_id, newVal)
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, notify_price_drop: newVal } : i))
+      show(newVal ? 'Уведомления о скидке включены' : 'Уведомления отключены')
+    } catch (e) {
+      console.error('toggle notify failed', e)
+    }
+  }
+
+  function buyItem(item: WishlistItem) {
+    window.open(item.external_url, '_blank', 'noopener,noreferrer')
   }
 
   const filtered = category === 'Все'
     ? items
-    : items.filter(i => i.products?.category === category)
+    : items.filter(i => i.category === category)
 
-  const totalOld = filtered.reduce((sum, i) => sum + (i.products?.price_old || i.products?.price || 0), 0)
-  const totalNew = filtered.reduce((sum, i) => sum + (i.products?.price || 0), 0)
+  const totalOld = filtered.reduce((sum, i) => sum + (i.price_old || i.price), 0)
+  const totalNew = filtered.reduce((sum, i) => sum + i.price, 0)
   const saved = totalOld - totalNew
 
   return (
@@ -114,19 +119,17 @@ export default function WishlistPage() {
 
           <div className="wishlist-list">
             {filtered.map(item => {
-              const p = item.products
-              if (!p) return null
-              const disc = p.price_old ? Math.round((1 - p.price / p.price_old) * 100) : null
+              const disc = item.price_old ? Math.round((1 - item.price / item.price_old) * 100) : null
               return (
                 <div key={item.id} className="wishlist-item">
-                  <img className="wishlist-item__img" src={p.image_url || ''} alt={p.title} />
+                  <img className="wishlist-item__img" src={item.image_url || ''} alt={item.title} />
                   <div className="wishlist-item__info">
-                    <div className="wishlist-item__brand">{p.brand || p.marketplace}</div>
-                    <div className="wishlist-item__name">{p.title}</div>
-                    <div className="wishlist-item__store">{p.marketplace}</div>
+                    <div className="wishlist-item__brand">{item.brand || marketplaceLabel(item.marketplace)}</div>
+                    <div className="wishlist-item__name">{item.title}</div>
+                    <div className="wishlist-item__store">{marketplaceLabel(item.marketplace)}</div>
                     <div className="wishlist-item__price-row">
-                      <span className="wishlist-item__price">{formatPrice(p.price)}</span>
-                      {p.price_old && <span className="wishlist-item__price-old">{formatPrice(p.price_old)}</span>}
+                      <span className="wishlist-item__price">{formatPrice(item.price)}</span>
+                      {item.price_old && <span className="wishlist-item__price-old">{formatPrice(item.price_old)}</span>}
                       {disc && <span className="wishlist-item__discount-badge">-{disc}%</span>}
                     </div>
                     <div
@@ -139,11 +142,12 @@ export default function WishlistPage() {
                         : <><BellOff size={11} /> Без уведомлений</>
                       }
                     </div>
+                    <PriceChart product_id={item.product_id} current_price={item.price} />
                   </div>
-                  <button className="wishlist-remove-btn" onClick={() => removeItem(item.id)}>
+                  <button className="wishlist-remove-btn" onClick={() => removeItem(item)}>
                     <Trash2 size={13} />
                   </button>
-                  <button className="wishlist-buy-btn">
+                  <button className="wishlist-buy-btn" onClick={() => buyItem(item)}>
                     <ExternalLink size={12} />
                     Купить
                   </button>
@@ -154,7 +158,7 @@ export default function WishlistPage() {
 
           {filtered.length > 0 && (
             <div className="wishlist-footer">
-              <button className="btn-primary">Перейти к покупкам</button>
+              <button className="btn-primary" onClick={() => buyItem(filtered[0])}>Перейти к покупкам</button>
             </div>
           )}
         </>

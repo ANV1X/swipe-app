@@ -1,11 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Flame, Heart } from 'lucide-react'
-import { supabase, Battle, Product, getAnonId } from '../lib/supabase'
+import { fetchActiveBattle, voteBattle, BattleData } from '../api/client'
 import { useToast } from '../components/Toast'
-
-function formatPrice(p: number) {
-  return p.toLocaleString('ru-RU') + ' ₽'
-}
 
 const TOP_WEEK = [
   { rank: 1, name: 'Minimal Beige', votes: 1204 },
@@ -14,66 +10,44 @@ const TOP_WEEK = [
 ]
 
 export default function BattlesPage() {
-  const [battle, setBattle] = useState<Battle | null>(null)
-  const [voted, setVoted] = useState<'a' | 'b' | null>(null)
+  const [battle, setBattle] = useState<BattleData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [voting, setVoting] = useState(false)
   const { show, node } = useToast()
-  const userId = getAnonId()
 
   useEffect(() => { loadBattle() }, [])
 
   async function loadBattle() {
     setLoading(true)
-    const { data: battles } = await supabase
-      .from('battles')
-      .select(`
-        *,
-        product_a:products!battles_product_a_id_fkey(*),
-        product_b:products!battles_product_b_id_fkey(*)
-      `)
-      .eq('active', true)
-      .limit(1)
-      .single()
-
-    if (battles) {
-      setBattle(battles as Battle)
-      const { data: existingVote } = await supabase
-        .from('battle_votes')
-        .select('choice')
-        .eq('battle_id', battles.id)
-        .eq('user_id', userId)
-        .maybeSingle()
-      if (existingVote) setVoted(existingVote.choice as 'a' | 'b')
+    try {
+      const data = await fetchActiveBattle()
+      setBattle(data)
+    } catch (e) {
+      console.error('load battle failed', e)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   async function vote(choice: 'a' | 'b') {
-    if (!battle || voted) return
-    const { error } = await supabase.from('battle_votes').insert({
-      battle_id: battle.id,
-      user_id: userId,
-      choice
-    })
-    if (error) { show('Вы уже голосовали!'); return }
-
-    const col = choice === 'a' ? 'votes_a' : 'votes_b'
-    const newCount = choice === 'a' ? (battle.votes_a + 1) : (battle.votes_b + 1)
-    await supabase.from('battles').update({ [col]: newCount }).eq('id', battle.id)
-
-    setBattle(prev => prev ? {
-      ...prev,
-      votes_a: choice === 'a' ? prev.votes_a + 1 : prev.votes_a,
-      votes_b: choice === 'b' ? prev.votes_b + 1 : prev.votes_b,
-    } : prev)
-    setVoted(choice)
-    show(`Вы проголосовали за Look ${choice.toUpperCase()}!`)
+    if (!battle || battle.my_vote || voting) return
+    setVoting(true)
+    try {
+      const updated = await voteBattle(battle.id, choice)
+      setBattle(updated)
+      show(`Вы проголосовали за Look ${choice.toUpperCase()}!`)
+    } catch {
+      show('Вы уже голосовали!')
+    } finally {
+      setVoting(false)
+    }
   }
 
-  const pa = battle?.product_a as Product | undefined
-  const pb = battle?.product_b as Product | undefined
+  const pa = battle?.product_a
+  const pb = battle?.product_b
+  const voted = battle?.my_vote ?? null
   const totalVotes = (battle?.votes_a || 0) + (battle?.votes_b || 0)
-  const pctA = totalVotes > 0 ? Math.round((battle!.votes_a / totalVotes) * 100) : 50
+  const pctA = totalVotes > 0 && battle ? Math.round((battle.votes_a / totalVotes) * 100) : 50
   const pctB = 100 - pctA
 
   return (
@@ -144,10 +118,10 @@ export default function BattlesPage() {
               </div>
             ) : (
               <>
-                <button className="battles-vote-btn battles-vote-btn--a" onClick={() => vote('a')}>
+                <button className="battles-vote-btn battles-vote-btn--a" onClick={() => vote('a')} disabled={voting}>
                   Голосовать за A
                 </button>
-                <button className="battles-vote-btn battles-vote-btn--b" onClick={() => vote('b')}>
+                <button className="battles-vote-btn battles-vote-btn--b" onClick={() => vote('b')} disabled={voting}>
                   Голосовать за B
                 </button>
               </>

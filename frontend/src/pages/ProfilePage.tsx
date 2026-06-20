@@ -1,35 +1,44 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Settings, Clock, Layers, SlidersHorizontal, ChevronRight, Bell, Shield } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import NotificationsSheet from '../components/NotificationsSheet'
 import { useToast } from '../components/Toast'
 import { useTheme } from '../lib/theme'
-
-const ACHIEVEMENTS = [
-  { emoji: '🏆', earned: true, label: 'Первый свайп' },
-  { emoji: '💎', earned: true, label: 'Стиляга' },
-  { emoji: '🎯', earned: true, label: 'Снайпер скидок' },
-  { emoji: '🔥', earned: false, label: '100 лайков' },
-  { emoji: '👑', earned: false, label: 'Король моды' },
-]
+import { fetchProfile, fetchUnreadCount, ProfileData } from '../api/client'
 
 export default function ProfilePage() {
   const [showNotifs, setShowNotifs] = useState(false)
+  const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [unread, setUnread] = useState(0)
   const navigate = useNavigate()
-  const { show, node } = useToast()
+  const { node } = useToast()
   const { theme } = useTheme()
+
+  useEffect(() => { load() }, [])
+
+  function load() {
+    fetchProfile().then(setProfile).catch(console.error)
+    fetchUnreadCount().then(r => setUnread(r.count)).catch(console.error)
+  }
+
+  const initial = (profile?.first_name || 'Г').slice(0, 1).toUpperCase()
 
   return (
     <div className="page-bg" style={{ paddingBottom: 16 }}>
       {node}
-      {showNotifs && <NotificationsSheet onClose={() => setShowNotifs(false)} />}
+      {showNotifs && (
+        <NotificationsSheet
+          onClose={() => setShowNotifs(false)}
+          onChange={() => fetchUnreadCount().then(r => setUnread(r.count)).catch(() => {})}
+        />
+      )}
 
       <div className="profile-header">
         <div className="profile-user-row">
-          <div className="profile-avatar">А</div>
+          <div className="profile-avatar">{initial}</div>
           <div>
-            <div className="profile-name">Александра</div>
-            <div className="profile-handle">@sasha.style</div>
+            <div className="profile-name">{profile?.first_name || 'Гость'}</div>
+            <div className="profile-handle">{profile?.username ? `@${profile.username}` : `с нами с ${profile ? new Date(profile.member_since).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) : '...'}`}</div>
           </div>
         </div>
         <button className="profile-settings-btn" onClick={() => navigate('/settings')}>
@@ -39,15 +48,15 @@ export default function ProfilePage() {
 
       <div className="profile-stats-row">
         <div className="profile-stat-card">
-          <div className="profile-stat-value">1 204</div>
+          <div className="profile-stat-value">{profile ? profile.total_swipes.toLocaleString('ru-RU') : '—'}</div>
           <div className="profile-stat-label">Свайпов</div>
         </div>
         <div className="profile-stat-card">
-          <div className="profile-stat-value">312</div>
+          <div className="profile-stat-value">{profile ? profile.likes.toLocaleString('ru-RU') : '—'}</div>
           <div className="profile-stat-label">Лайков</div>
         </div>
         <div className="profile-stat-card">
-          <div className="profile-stat-value">78</div>
+          <div className="profile-stat-value">{profile ? profile.wishlist_count.toLocaleString('ru-RU') : '—'}</div>
           <div className="profile-stat-label">Вишлист</div>
         </div>
       </div>
@@ -55,12 +64,12 @@ export default function ProfilePage() {
       <div className="profile-achievements-section">
         <div className="profile-achievements-title">Достижения</div>
         <div className="profile-achievements-row">
-          {ACHIEVEMENTS.map((a, i) => (
+          {(profile?.achievements || []).map(a => (
             <div
-              key={i}
-              className={`profile-achievement-badge${a.earned ? ' earned' : ''}`}
-              title={a.label}
-              style={{ opacity: a.earned ? 1 : 0.35 }}
+              key={a.id}
+              className={`profile-achievement-badge${a.unlocked ? ' earned' : ''}`}
+              title={`${a.title} — ${a.description} (${a.progress}/${a.target})`}
+              style={{ opacity: a.unlocked ? 1 : 0.35 }}
             >
               {a.emoji}
             </div>
@@ -74,10 +83,12 @@ export default function ProfilePage() {
             <Bell size={18} />
           </div>
           <div className="profile-menu-label">Уведомления</div>
-          <div style={{
-            background: 'var(--red)', color: '#fff',
-            fontSize: 11, fontWeight: 700, borderRadius: 8, padding: '2px 7px', marginRight: 8,
-          }}>3</div>
+          {unread > 0 && (
+            <div style={{
+              background: 'var(--red)', color: '#fff',
+              fontSize: 11, fontWeight: 700, borderRadius: 8, padding: '2px 7px', marginRight: 8,
+            }}>{unread}</div>
+          )}
           <ChevronRight size={16} className="profile-menu-arrow" />
         </div>
         <div className="profile-menu-item" onClick={() => navigate('/history')}>

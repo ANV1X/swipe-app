@@ -67,7 +67,7 @@ export function useTelegram() {
   }, [])
 
   const haptic = (style: 'light' | 'medium' | 'heavy' = 'light') => {
-    try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(style) } catch {}
+    try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(style) } catch { /* haptics unavailable */ }
   }
 
   return {

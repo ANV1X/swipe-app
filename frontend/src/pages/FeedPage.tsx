@@ -1,12 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { SlidersHorizontal, ChevronDown, X, Heart } from 'lucide-react'
-import { supabase, Product, getAnonId } from '../lib/supabase'
+import { fetchProducts, postSwipe, fetchWishlist, formatPrice, Product } from '../api/client'
 
 const CATEGORIES = ['Все', 'Одежда', 'Обувь', 'Аксессуары']
-
-function formatPrice(p: number) {
-  return p.toLocaleString('ru-RU') + ' ₽'
-}
+const PRICE_PRESETS = [0, 3000, 8000, 20000]
 
 const RATINGS: Record<string, string> = {}
 function getRating(id: string) {
@@ -18,28 +15,42 @@ export default function FeedPage() {
   const [cards, setCards] = useState<Product[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [category, setCategory] = useState('Все')
-  const [wishlist, setWishlist] = useState<Set<string>>(new Set())
+  const [priceMax, setPriceMax] = useState(0)
+  const [showFilters, setShowFilters] = useState(false)
+  const [, setWishlist] = useState<Set<string>>(new Set())
   const [swipeDir, setSwipeDir] = useState<'like' | 'nope' | null>(null)
+  const [loading, setLoading] = useState(true)
   const startX = useRef(0)
   const currentX = useRef(0)
   const isDragging = useRef(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { loadProducts() }, [category])
+  useEffect(() => { loadProducts() }, [category, priceMax])
   useEffect(() => { loadWishlist() }, [])
 
   async function loadProducts() {
-    let q = supabase.from('products').select('*').order('created_at', { ascending: false })
-    if (category !== 'Все') q = q.eq('category', category)
-    const { data } = await q
-    setCards(data || [])
-    setCurrentIndex(0)
+    setLoading(true)
+    try {
+      const data = await fetchProducts({
+        category: category !== 'Все' ? category : undefined,
+        price_max: priceMax || undefined,
+      })
+      setCards(data)
+      setCurrentIndex(0)
+    } catch (e) {
+      console.error('load products failed', e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function loadWishlist() {
-    const userId = getAnonId()
-    const { data } = await supabase.from('wishlist').select('product_id').eq('user_id', userId)
-    setWishlist(new Set(data?.map(d => d.product_id) || []))
+    try {
+      const data = await fetchWishlist()
+      setWishlist(new Set(data.map(d => d.product_id)))
+    } catch (e) {
+      console.error('load wishlist failed', e)
+    }
   }
 
   const card = cards[currentIndex]
@@ -97,15 +108,17 @@ export default function FeedPage() {
 
   async function recordSwipe(dir: 'like' | 'nope') {
     if (!card) return
-    const userId = getAnonId()
-    await supabase.from('swipes').insert({ user_id: userId, product_id: card.id, direction: dir })
-    if (dir === 'like') {
-      await supabase.from('wishlist').upsert({ user_id: userId, product_id: card.id, notify_price_drop: true })
-      setWishlist(s => new Set([...s, card.id]))
+    try {
+      const result = await postSwipe(card.id, dir)
+      if (result.added_to_wishlist) {
+        setWishlist(s => new Set([...s, card.id]))
+      }
+    } catch (e) {
+      console.error('swipe failed', e)
     }
   }
 
-  if (!card && cards.length > 0) {
+  if (!loading && !card && cards.length > 0) {
     return (
       <div className="feed-page">
         <div className="page-center" style={{ flex: 1 }}>
@@ -128,8 +141,9 @@ export default function FeedPage() {
         <div className="feed-title">
           Лента <ChevronDown size={18} style={{ color: 'var(--text)' }} />
         </div>
-        <button className="feed-filter-btn">
+        <button className="feed-filter-btn" onClick={() => setShowFilters(true)}>
           <SlidersHorizontal size={18} />
+          {priceMax > 0 && <span className="nav-badge" style={{ position: 'absolute', top: -4, right: -4 }}>•</span>}
         </button>
       </div>
 
@@ -144,7 +158,7 @@ export default function FeedPage() {
       </div>
 
       <div className="card-stack">
-        {cards.length === 0 ? (
+        {loading && cards.length === 0 ? (
           <div className="page-center"><div className="spinner" /></div>
         ) : card ? (
           <>
@@ -207,6 +221,29 @@ export default function FeedPage() {
           <Heart size={28} fill="white" />
         </button>
       </div>
+
+      {showFilters && (
+        <div className="modal-overlay" onClick={() => setShowFilters(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div className="modal-header">
+              <h3 className="modal-title">Фильтр по цене</h3>
+              <button className="modal-close" onClick={() => setShowFilters(false)}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '4px 16px 20px' }}>
+              {PRICE_PRESETS.map(p => (
+                <button
+                  key={p}
+                  className={`filter-chip${priceMax === p ? ' active' : ''}`}
+                  onClick={() => { setPriceMax(p); setShowFilters(false) }}
+                >
+                  {p === 0 ? 'Любая цена' : `до ${formatPrice(p)}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

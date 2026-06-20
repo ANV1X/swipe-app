@@ -13,7 +13,9 @@ import HistoryPage from './pages/HistoryPage'
 import SettingsPage from './pages/SettingsPage'
 import OnboardingPage from './pages/OnboardingPage'
 import AdminPage from './pages/AdminPage'
-import { supabase } from './lib/supabase'
+import { SharedWishlistList, SharedWishlistDetail, SharedWishlistCreate } from './pages/SharedWishlist'
+import { setInitData, fetchUnreadCount, fetchMe, registerReferral } from './api/client'
+import { useTelegram } from './hooks/useTelegram'
 import { ThemeProvider } from './lib/theme'
 import './styles.css'
 
@@ -26,29 +28,63 @@ function NavIcon({ d }: { d: React.ReactNode }) {
 }
 
 function AppShell() {
+  const { initData } = useTelegram()
   const [unreadCount, setUnreadCount] = useState(0)
   const [onboardingDone, setOnboardingDone] = useState<boolean>(
     () => Boolean(localStorage.getItem('onboarding_done'))
   )
+  const [checkingUser, setCheckingUser] = useState(true)
+
+  // Подключаем Telegram initData к API-клиенту, как только он становится доступен
+  useEffect(() => {
+    if (initData) setInitData(initData)
+  }, [initData])
+
+  // Синхронизируемся с backend: онбординг и реферальный код
+  useEffect(() => {
+    fetchMe()
+      .then(me => {
+        if (me.onboarding_done) {
+          localStorage.setItem('onboarding_done', '1')
+          setOnboardingDone(true)
+        }
+
+        const alreadyHandled = localStorage.getItem('referral_handled')
+        if (!alreadyHandled) {
+          const params = new URLSearchParams(window.location.search)
+          const startParam = (window as Window & {
+            Telegram?: { WebApp?: { initDataUnsafe?: { start_param?: string } } }
+          }).Telegram?.WebApp?.initDataUnsafe?.start_param
+          const refCode = params.get('ref') || startParam
+          if (refCode && refCode !== me.referral_code) {
+            registerReferral(refCode).catch(() => {})
+          }
+          localStorage.setItem('referral_handled', '1')
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCheckingUser(false))
+  }, [initData])
 
   useEffect(() => {
-    supabase.from('notifications').select('id', { count: 'exact' }).eq('read', false)
-      .then(({ count }) => setUnreadCount(count || 0))
-
-    const channel = supabase
-      .channel('notifications-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
-        supabase.from('notifications').select('id', { count: 'exact' }).eq('read', false)
-          .then(({ count }) => setUnreadCount(count || 0))
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    const load = () => fetchUnreadCount().then(r => setUnreadCount(r.count)).catch(() => {})
+    load()
+    const interval = setInterval(load, 20000)
+    return () => clearInterval(interval)
   }, [])
 
   if (!onboardingDone) {
     return (
       <div className="app">
         <OnboardingPage onDone={() => setOnboardingDone(true)} />
+      </div>
+    )
+  }
+
+  if (checkingUser) {
+    return (
+      <div className="app">
+        <div className="page-center" style={{ height: '100vh' }}><div className="spinner" /></div>
       </div>
     )
   }
@@ -69,6 +105,9 @@ function AppShell() {
           <Route path="/history"     element={<HistoryPage />} />
           <Route path="/settings"    element={<SettingsPage />} />
           <Route path="/admin"       element={<AdminPage />} />
+          <Route path="/shared"      element={<SharedWishlistList />} />
+          <Route path="/shared/new"  element={<SharedWishlistCreate />} />
+          <Route path="/shared/:id"  element={<SharedWishlistDetail />} />
         </Routes>
       </main>
 
@@ -94,13 +133,9 @@ function AppShell() {
         </NavLink>
 
         <NavLink to="/profile" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-          {({ isActive }) => (
-            <>
-              <NavIcon d={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>} />
-              <span className="nav-label">Профиль</span>
-              {unreadCount > 0 && <span className="nav-badge">{unreadCount}</span>}
-            </>
-          )}
+          <NavIcon d={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>} />
+          <span className="nav-label">Профиль</span>
+          {unreadCount > 0 && <span className="nav-badge">{unreadCount}</span>}
         </NavLink>
       </nav>
     </div>

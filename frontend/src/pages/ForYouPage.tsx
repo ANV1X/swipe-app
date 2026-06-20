@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Sparkles } from 'lucide-react'
-import { supabase, Product } from '../lib/supabase'
+import { ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/Toast'
+import {
+  fetchForYou, fetchForYouMeta, fetchMe, updateMe,
+  formatPrice, Product,
+} from '../api/client'
 
 const COLORS = [
   { name: 'Чёрный', color: '#1C1C1E' },
@@ -14,26 +17,33 @@ const COLORS = [
 
 const STYLES = ['Oversize', 'Minimal', 'Casual', 'Smart']
 
-function formatPrice(p: number) {
-  return p.toLocaleString('ru-RU') + ' ₽'
-}
-
 export default function ForYouPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [activeStyles, setActiveStyles] = useState<Set<string>>(new Set(['Minimal']))
   const [activeColors, setActiveColors] = useState<Set<string>>(new Set(['Чёрный', 'Бежевый']))
+  const [matchCount, setMatchCount] = useState(0)
+  const [matchPct, setMatchPct] = useState(90)
   const navigate = useNavigate()
   const { show, node } = useToast()
 
   useEffect(() => {
-    supabase.from('products').select('*').order('created_at', { ascending: false }).limit(6)
-      .then(({ data }) => setProducts(data || []))
+    fetchForYou(6).then(setProducts).catch(console.error)
+    fetchForYouMeta().then(m => { setMatchCount(m.match_count); setMatchPct(m.match_pct) }).catch(console.error)
+    fetchMe().then(me => {
+      if (me.pref_styles.length) setActiveStyles(new Set(me.pref_styles))
+      if (me.pref_colors.length) setActiveColors(new Set(me.pref_colors))
+    }).catch(console.error)
   }, [])
+
+  function persist(styles: Set<string>, colors: Set<string>) {
+    updateMe({ pref_styles: [...styles], pref_colors: [...colors] }).catch(console.error)
+  }
 
   function toggleStyle(s: string) {
     setActiveStyles(prev => {
       const n = new Set(prev)
       if (n.has(s)) n.delete(s); else n.add(s)
+      persist(n, activeColors)
       return n
     })
     show('Предпочтения обновлены')
@@ -43,12 +53,14 @@ export default function ForYouPage() {
     setActiveColors(prev => {
       const n = new Set(prev)
       if (n.has(name)) n.delete(name); else n.add(name)
+      persist(activeStyles, n)
       return n
     })
   }
 
-  const matchCount = 32
-  const matchPct = 96
+  function openProduct(p: Product) {
+    window.open(p.external_url, '_blank', 'noopener,noreferrer')
+  }
 
   return (
     <div className="page-bg">
@@ -105,7 +117,7 @@ export default function ForYouPage() {
       <div className="foryou-match-card">
         <div className="foryou-match-left">
           <div className="foryou-match-title">Подборка сегодня</div>
-          <div className="foryou-match-count">{matchCount} новых товара</div>
+          <div className="foryou-match-count">{matchCount} товаров подходит</div>
           <div className="foryou-match-sub">Совпадение вкуса</div>
         </div>
         <div className="foryou-match-pct">{matchPct}%</div>
@@ -116,7 +128,7 @@ export default function ForYouPage() {
         <div className="foryou-recs-title">Рекомендуем</div>
         <div className="foryou-recs-grid">
           {products.map(p => (
-            <div key={p.id} className="foryou-rec-card">
+            <div key={p.id} className="foryou-rec-card" onClick={() => openProduct(p)} style={{ cursor: 'pointer' }}>
               <img src={p.image_url || ''} alt={p.title} />
               <div className="foryou-rec-info">
                 <div className="foryou-rec-brand">{p.brand || p.marketplace}</div>

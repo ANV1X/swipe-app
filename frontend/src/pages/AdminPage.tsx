@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import {
+  fetchAdminStats, exportAdminUsers, exportAdminSwipes, exportAdminBattles, exportAdminAll,
+  createBattle, createCollection, fetchProducts, Product as ApiProduct,
+} from '../api/client'
 import {
   Users, Heart, Bookmark, Swords, Share2, Download, FileText,
   ChevronDown, Activity, FolderPlus, RefreshCw, ArrowLeft, Shield, X
@@ -14,13 +17,7 @@ interface Stats {
   referrals: Record<string, number>
 }
 
-interface Product {
-  id: string
-  title: string
-  brand: string | null
-  price: number
-  image_url: string | null
-}
+type Product = Pick<ApiProduct, 'id' | 'title' | 'brand' | 'price' | 'image_url'>
 
 export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -34,120 +31,49 @@ export default function AdminPage() {
   }, [])
 
   async function loadStats() {
-    const [userStats, swipeStats, battleStats, wishlistStats, sharedWishlistStats, referralStats] = await Promise.all([
-      supabase.from('user_stats').select('*').limit(1),
-      supabase.from('swipe_stats').select('*').limit(1),
-      supabase.from('battle_stats').select('*').limit(1),
-      supabase.from('wishlist_stats').select('*').limit(1),
-      supabase.from('shared_wishlist_stats').select('*').limit(1),
-      supabase.from('referral_stats').select('*').limit(1),
-    ])
-
-    setStats({
-      users: convertRecord(userStats.data?.[0]),
-      swipes: convertRecord(swipeStats.data?.[0]),
-      battles: convertRecord(battleStats.data?.[0]),
-      wishlist: convertRecord(wishlistStats.data?.[0]),
-      sharedWishlists: convertRecord(sharedWishlistStats.data?.[0]),
-      referrals: convertRecord(referralStats.data?.[0]),
-    })
-    setLoading(false)
-  }
-
-  function convertRecord(record: Record<string, unknown> | undefined): Record<string, number> {
-    if (!record) return {}
-    const result: Record<string, number> = {}
-    for (const [key, value] of Object.entries(record)) {
-      if (typeof value === 'number') result[key] = value
-      else if (value === null) result[key] = 0
+    setLoading(true)
+    try {
+      const data = await fetchAdminStats()
+      setStats(data as unknown as Stats)
+    } catch (e) {
+      console.error('load admin stats failed', e)
+    } finally {
+      setLoading(false)
     }
-    return result
   }
 
   async function exportUsers() {
-    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
-    if (data) downloadCSV(data, 'users_export.csv')
+    try {
+      const data = await exportAdminUsers()
+      if (data.length) downloadCSV(data, 'users_export.csv')
+    } catch (e) { console.error('export users failed', e) }
   }
 
   async function exportSwipes() {
-    const { data } = await supabase
-      .from('swipes')
-      .select('id, direction, created_at, profiles(email, display_name), products(title, brand, price)')
-      .order('created_at', { ascending: false })
-      .limit(10000)
-
-    if (data) {
-      const flatData = data.map(s => {
-        const p = s.profiles as unknown as { email?: string; display_name?: string } | null
-        const pr = s.products as unknown as { title?: string; brand?: string } | null
-        return {
-          id: s.id,
-          user_email: p?.email || '',
-          user_name: p?.display_name || '',
-          product_title: pr?.title || '',
-          product_brand: pr?.brand || '',
-          direction: s.direction,
-          created_at: s.created_at,
-        }
-      })
-      downloadCSV(flatData, 'swipes_export.csv')
-    }
+    try {
+      const data = await exportAdminSwipes()
+      if (data.length) downloadCSV(data, 'swipes_export.csv')
+    } catch (e) { console.error('export swipes failed', e) }
   }
 
   async function exportBattles() {
-    const { data } = await supabase
-      .from('battles')
-      .select('id, votes_a, votes_b, active, created_at, product_a:products!battles_product_a_id_fkey(title, brand, price), product_b:products!battles_product_b_id_fkey(title, brand, price)')
-      .order('created_at', { ascending: false })
-
-    if (data) {
-      const flatData = data.map(b => {
-        const pa = b.product_a as unknown as { title?: string; brand?: string; price?: number } | null
-        const pb = b.product_b as unknown as { title?: string; brand?: string; price?: number } | null
-        return {
-          id: b.id,
-          product_a_title: pa?.title || '',
-          product_a_brand: pa?.brand || '',
-          product_a_price: pa?.price || 0,
-          product_b_title: pb?.title || '',
-          product_b_brand: pb?.brand || '',
-          product_b_price: pb?.price || 0,
-          votes_a: b.votes_a,
-          votes_b: b.votes_b,
-          total_votes: b.votes_a + b.votes_b,
-          active: b.active,
-          created_at: b.created_at,
-        }
-      })
-      downloadCSV(flatData, 'battles_export.csv')
-    }
+    try {
+      const data = await exportAdminBattles()
+      if (data.length) downloadCSV(data, 'battles_export.csv')
+    } catch (e) { console.error('export battles failed', e) }
   }
 
   async function exportAll() {
-    const [users, swipes, battles, wishlists, referrals] = await Promise.all([
-      supabase.from('profiles').select('*').limit(10000),
-      supabase.from('swipes').select('id, direction, created_at').limit(10000),
-      supabase.from('battles').select('*').limit(1000),
-      supabase.from('wishlist').select('*').limit(10000),
-      supabase.from('referrals').select('*').limit(10000),
-    ])
-
-    const allData = {
-      users: users.data,
-      swipes: swipes.data,
-      battles: battles.data,
-      wishlist: wishlists.data,
-      referrals: referrals.data,
-      exported_at: new Date().toISOString(),
-    }
-
-    const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `full_export_${new Date().toISOString().split('T')[0]}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+    try {
+      const allData = await exportAdminAll()
+      const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `full_export_${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) { console.error('export all failed', e) }
   }
 
   function downloadCSV(data: Record<string, unknown>[], filename: string) {
@@ -404,17 +330,21 @@ function CreateBattleModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    supabase.from('products').select('id, title, brand, price, image_url').limit(100).then(({ data }) => {
-      setProducts((data as Product[]) || [])
-    })
+    fetchProducts({}).then(data => setProducts(data.slice(0, 100))).catch(console.error)
   }, [])
 
   async function create() {
     if (!productA || !productB || productA === productB) return
     setLoading(true)
-    const { error } = await supabase.from('battles').insert({ product_a_id: productA, product_b_id: productB, active: true })
-    if (!error) { onCreated(); onClose() }
-    setLoading(false)
+    try {
+      await createBattle(productA, productB)
+      onCreated()
+      onClose()
+    } catch (e) {
+      console.error('create battle failed', e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -456,16 +386,22 @@ function CreateBattleModal({ onClose, onCreated }: { onClose: () => void; onCrea
 
 function CreateCollectionModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState('')
-  const [authorName, setAuthorName] = useState('')
   const [authorHandle, setAuthorHandle] = useState('')
+  const [coverImage, setCoverImage] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function create() {
-    if (!name || !authorName) return
+    if (!name) return
     setLoading(true)
-    const { error } = await supabase.from('collections').insert({ name, author_name: authorName, author_handle: authorHandle || null })
-    if (!error) { onCreated(); onClose() }
-    setLoading(false)
+    try {
+      await createCollection(name, coverImage || undefined, authorHandle || undefined)
+      onCreated()
+      onClose()
+    } catch (e) {
+      console.error('create collection failed', e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -477,12 +413,12 @@ function CreateCollectionModal({ onClose, onCreated }: { onClose: () => void; on
         </div>
         <div className="form-fields">
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Название коллекции" />
-          <input type="text" value={authorName} onChange={(e) => setAuthorName(e.target.value)} placeholder="Имя автора" />
-          <input type="text" value={authorHandle} onChange={(e) => setAuthorHandle(e.target.value)} placeholder="@username (необязательно)" />
+          <input type="text" value={authorHandle} onChange={(e) => setAuthorHandle(e.target.value)} placeholder="@username автора (необязательно)" />
+          <input type="text" value={coverImage} onChange={(e) => setCoverImage(e.target.value)} placeholder="URL обложки (необязательно)" />
         </div>
         <div className="modal-actions">
           <button onClick={onClose} className="btn secondary">Отмена</button>
-          <button onClick={create} disabled={!name || !authorName || loading} className="btn primary">
+          <button onClick={create} disabled={!name || loading} className="btn primary">
             {loading ? 'Создание...' : 'Создать'}
           </button>
         </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react'
-import { supabase, getAnonId } from '../lib/supabase'
+import { updateMe } from '../api/client'
 
 type StepId = 'welcome' | 'gender' | 'styles' | 'colors' | 'brands' | 'budget' | 'done'
 
@@ -52,16 +52,6 @@ const BUDGETS = [
   { id: 'luxury', label: 'Без ограничений', sub: 'Всё подряд' },
 ]
 
-const STEP_LABELS: Record<StepId, string> = {
-  welcome: '',
-  gender: 'Для кого',
-  styles: 'Твой стиль',
-  colors: 'Любимые цвета',
-  brands: 'Любимые бренды',
-  budget: 'Твой бюджет',
-  done: '',
-}
-
 function ProgressBar({ step }: { step: number }) {
   const total = STEPS.length - 2
   const cur = Math.min(step - 1, total)
@@ -99,8 +89,18 @@ export default function OnboardingPage({ onDone }: { onDone: () => void }) {
 
   async function finish() {
     setSaving(true)
-    const userId = getAnonId()
-    await supabase.from('swipes').delete().eq('user_id', 'never-exists') // no-op warmup
+    try {
+      await updateMe({
+        onboarding_done: true,
+        pref_gender: gender || 'all',
+        pref_styles: [...styles],
+        pref_colors: [...colors],
+        pref_brands: [...brands],
+        pref_budget: budget || 'mid',
+      })
+    } catch (e) {
+      console.error('failed to save onboarding prefs', e)
+    }
     localStorage.setItem('onboarding_done', '1')
     localStorage.setItem('pref_gender', gender || 'all')
     localStorage.setItem('pref_styles', JSON.stringify([...styles]))

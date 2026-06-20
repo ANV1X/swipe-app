@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, Moon, Sun, Bell, Star, Globe, Smartphone, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../lib/theme'
 import { useToast } from '../components/Toast'
+import { fetchMe, updateMe } from '../api/client'
 
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -16,12 +17,46 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 export default function SettingsPage() {
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
-  const { show, node } = useToast()
+  const { node } = useToast()
 
   const [notifPriceDrop, setNotifPriceDrop] = useState(true)
   const [notifNewInColl, setNotifNewInColl] = useState(true)
   const [notifFriendActivity, setNotifFriendActivity] = useState(false)
   const [notifBattles, setNotifBattles] = useState(true)
+  const [resetting, setResetting] = useState(false)
+
+  useEffect(() => {
+    fetchMe().then(me => {
+      setNotifPriceDrop(me.notif_price_drop)
+      setNotifNewInColl(me.notif_new_in_collection)
+      setNotifFriendActivity(me.notif_friend_activity)
+      setNotifBattles(me.notif_battles)
+    }).catch(console.error)
+  }, [])
+
+  function toggle(
+    key: 'notif_price_drop' | 'notif_new_in_collection' | 'notif_friend_activity' | 'notif_battles',
+    current: boolean,
+    setter: (v: boolean) => void,
+  ) {
+    const next = !current
+    setter(next)
+    updateMe({ [key]: next }).catch(e => {
+      console.error('failed to update setting', e)
+      setter(current) // откатываем при ошибке
+    })
+  }
+
+  async function retakeOnboarding() {
+    setResetting(true)
+    try {
+      await updateMe({ onboarding_done: false })
+    } catch (e) {
+      console.error('failed to reset onboarding', e)
+    }
+    localStorage.removeItem('onboarding_done')
+    window.location.href = '/'
+  }
 
   return (
     <div className="page-bg" style={{ paddingBottom: 32 }}>
@@ -67,7 +102,7 @@ export default function SettingsPage() {
               <div className="settings-row__label">Снижение цены</div>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 1 }}>Когда цена упадёт в вишлисте</div>
             </div>
-            <Toggle on={notifPriceDrop} onToggle={() => setNotifPriceDrop(v => !v)} />
+            <Toggle on={notifPriceDrop} onToggle={() => toggle('notif_price_drop', notifPriceDrop, setNotifPriceDrop)} />
           </div>
           <div className="settings-row">
             <div className="settings-row__icon" style={{ background: 'var(--accent-light)' }}>
@@ -77,7 +112,7 @@ export default function SettingsPage() {
               <div className="settings-row__label">Новинки в коллекциях</div>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 1 }}>Обновления подписок</div>
             </div>
-            <Toggle on={notifNewInColl} onToggle={() => setNotifNewInColl(v => !v)} />
+            <Toggle on={notifNewInColl} onToggle={() => toggle('notif_new_in_collection', notifNewInColl, setNotifNewInColl)} />
           </div>
           <div className="settings-row">
             <div className="settings-row__icon" style={{ background: 'rgba(52,199,89,0.12)' }}>
@@ -87,7 +122,7 @@ export default function SettingsPage() {
               <div className="settings-row__label">Активность друзей</div>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 1 }}>Вишлисты и лайки</div>
             </div>
-            <Toggle on={notifFriendActivity} onToggle={() => setNotifFriendActivity(v => !v)} />
+            <Toggle on={notifFriendActivity} onToggle={() => toggle('notif_friend_activity', notifFriendActivity, setNotifFriendActivity)} />
           </div>
           <div className="settings-row">
             <div className="settings-row__icon" style={{ background: 'rgba(255,159,10,0.12)' }}>
@@ -97,7 +132,7 @@ export default function SettingsPage() {
               <div className="settings-row__label">Батлы</div>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 1 }}>Новые голосования</div>
             </div>
-            <Toggle on={notifBattles} onToggle={() => setNotifBattles(v => !v)} />
+            <Toggle on={notifBattles} onToggle={() => toggle('notif_battles', notifBattles, setNotifBattles)} />
           </div>
         </div>
       </div>
@@ -105,10 +140,7 @@ export default function SettingsPage() {
       {/* Retake onboarding */}
       <div style={{ padding: '0 16px' }}>
         <div className="settings-section">
-          <div className="settings-row" onClick={() => {
-            localStorage.removeItem('onboarding_done')
-            window.location.href = '/'
-          }}>
+          <div className="settings-row" onClick={retakeOnboarding} style={{ opacity: resetting ? 0.6 : 1, pointerEvents: resetting ? 'none' : 'auto' }}>
             <div className="settings-row__icon" style={{ background: 'var(--accent-light)' }}>
               <Star size={16} color="var(--accent)" />
             </div>

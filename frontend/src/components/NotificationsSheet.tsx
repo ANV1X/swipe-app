@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { TrendingDown, Package, Bookmark, X } from 'lucide-react'
-import { supabase, Notification } from '../lib/supabase'
+import { fetchNotifications, markNotificationRead, markAllNotificationsRead, NotificationData } from '../api/client'
 
-type Props = { onClose: () => void }
+type Props = { onClose: () => void; onChange?: () => void }
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -20,28 +20,37 @@ function NotifIcon({ type }: { type: string }) {
   return <div className={cls}><Bookmark size={18} /></div>
 }
 
-export default function NotificationsSheet({ onClose }: Props) {
-  const [notifications, setNotifications] = useState<Notification[]>([])
+export default function NotificationsSheet({ onClose, onChange }: Props) {
+  const [notifications, setNotifications] = useState<NotificationData[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.from('notifications')
-      .select('*, products(*)')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setNotifications((data || []) as Notification[])
-        setLoading(false)
-      })
+    fetchNotifications()
+      .then(setNotifications)
+      .catch(console.error)
+      .finally(() => setLoading(false))
   }, [])
 
   async function markRead(id: string) {
-    await supabase.from('notifications').update({ read: true }).eq('id', id)
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    const target = notifications.find(n => n.id === id)
+    if (!target || target.read) return
+    try {
+      await markNotificationRead(id)
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+      onChange?.()
+    } catch (e) {
+      console.error('mark read failed', e)
+    }
   }
 
   async function markAllRead() {
-    await supabase.from('notifications').update({ read: true }).eq('read', false)
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    try {
+      await markAllNotificationsRead()
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+      onChange?.()
+    } catch (e) {
+      console.error('mark all read failed', e)
+    }
   }
 
   const unreadCount = notifications.filter(n => !n.read).length

@@ -1,50 +1,37 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, Users, Heart, Bookmark, X, ChevronRight, Plus, Copy, Check, Share2, Trash2 } from 'lucide-react'
-import { supabase, Friend, Product } from '../lib/supabase'
+import { UserPlus, Users, Heart, Bookmark, X, Plus, Copy, Check, Share2, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import {
+  fetchFriends, addFriend as apiAddFriend, removeFriend as apiRemoveFriend,
+  fetchSharedWishlists, createSharedWishlist, fetchWishlist, fetchMe,
+  FriendData, SharedWishlistData, WishlistItem,
+} from '../api/client'
 import { useToast } from '../components/Toast'
 
 const TABS = ['Активность', 'Общие вишлисты']
 
-type SharedWishlist = {
-  id: string
-  name: string
-  owner_id: string
-  is_public: boolean
-  created_at: string
-  member_count?: number
-  product_count?: number
-  preview_images?: string[]
-}
-
-type WishItem = {
-  id: string
-  product_id: string
-  notify_price_drop: boolean
-  products: Product
-}
-
-function FriendSheet({ friend, onClose }: { friend: Friend; onClose: () => void }) {
-  const [wishlistItems, setWishlistItems] = useState<WishItem[]>([])
+function FriendSheet({ friend, onClose, onCreatedWishlist }: {
+  friend: FriendData; onClose: () => void; onCreatedWishlist: (id: string) => void
+}) {
+  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
+  const [creating, setCreating] = useState(false)
   const { show } = useToast()
 
   useEffect(() => {
-    supabase.from('wishlist').select('*, products(*)').limit(4)
-      .then(({ data }) => setWishlistItems((data || []) as WishItem[]))
+    fetchWishlist().then(items => setWishlistItems(items.slice(0, 4))).catch(console.error)
   }, [])
 
-  async function createSharedWishlist() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { show('Войдите в аккаунт'); return }
-
-    const { error } = await supabase.from('shared_wishlists').insert({
-      name: `С ${friend.friend_name}`,
-      owner_id: user.id,
-      is_public: false,
-    })
-
-    if (!error) {
+  async function handleCreateSharedWishlist() {
+    setCreating(true)
+    try {
+      const sw = await createSharedWishlist(`С ${friend.friend_name}`)
       show('Совместный вишлист создан!')
-      onClose()
+      onCreatedWishlist(sw.id)
+    } catch (e) {
+      console.error('create shared wishlist failed', e)
+      show('Не удалось создать вишлист')
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -68,31 +55,20 @@ function FriendSheet({ friend, onClose }: { friend: Friend; onClose: () => void 
           <button className="modal-close" onClick={onClose}><X size={14} /></button>
         </div>
         <div className="modal-body" style={{ padding: '16px' }}>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-            {[{ label: 'Свайпов', val: '—' }, { label: 'Лайков', val: '—' }, { label: 'Вишлист', val: wishlistItems.length }].map(s => (
-              <div key={s.label} style={{
-                flex: 1, background: 'var(--surface2)', borderRadius: 14, padding: '12px 8px', textAlign: 'center'
-              }}>
-                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>{s.val}</div>
-                <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
-            Вишлист друга
+            Поделиться вещами из своего вишлиста
           </div>
           {wishlistItems.length > 0 ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-              {wishlistItems.slice(0, 4).map(p => (
+              {wishlistItems.map(p => (
                 <div key={p.id} style={{
                   background: 'var(--surface2)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer'
                 }}>
-                  <img src={p.products?.image_url || ''} alt={p.products?.title} style={{
+                  <img src={p.image_url || ''} alt={p.title} style={{
                     width: '100%', aspectRatio: '3/4', objectFit: 'cover', objectPosition: 'top', display: 'block'
                   }} />
                   <div style={{ padding: '6px 8px', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-                    {p.products?.price?.toLocaleString('ru-RU')} ₽
+                    {p.price.toLocaleString('ru-RU')} ₽
                   </div>
                 </div>
               ))}
@@ -103,13 +79,14 @@ function FriendSheet({ friend, onClose }: { friend: Friend; onClose: () => void 
             </div>
           )}
 
-          <button onClick={createSharedWishlist} style={{
+          <button onClick={handleCreateSharedWishlist} disabled={creating} style={{
             width: '100%', background: 'var(--accent)', color: '#fff', border: 'none',
             borderRadius: 14, padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            opacity: creating ? 0.7 : 1,
           }}>
             <Users size={18} />
-            Создать совместный вишлист
+            {creating ? 'Создаём...' : 'Создать совместный вишлист'}
           </button>
         </div>
       </div>
@@ -179,9 +156,8 @@ function AddFriendModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name:
   )
 }
 
-function CreateWishlistModal({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string, isPublic: boolean) => void }) {
+function CreateWishlistModal({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string) => void }) {
   const [name, setName] = useState('')
-  const [isPublic, setIsPublic] = useState(false)
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -203,27 +179,13 @@ function CreateWishlistModal({ onClose, onCreate }: { onClose: () => void; onCre
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="Название вишлиста"
+            onKeyDown={e => e.key === 'Enter' && name.trim() && onCreate(name.trim())}
             style={{
               width: '100%', padding: 14, borderRadius: 12,
               border: '1.5px solid var(--border)', background: 'var(--surface2)',
               fontSize: 15, color: 'var(--text)'
             }}
           />
-          <label style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: 14, background: 'var(--surface2)', borderRadius: 12, cursor: 'pointer'
-          }}>
-            <input
-              type="checkbox"
-              checked={isPublic}
-              onChange={e => setIsPublic(e.target.checked)}
-              style={{ width: 20, height: 20 }}
-            />
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Публичный вишлист</div>
-              <div style={{ fontSize: 12, color: 'var(--text2)' }}>Доступен всем по ссылке</div>
-            </div>
-          </label>
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
             <button onClick={onClose} style={{
               flex: 1, padding: 14, borderRadius: 12, border: 'none',
@@ -231,7 +193,7 @@ function CreateWishlistModal({ onClose, onCreate }: { onClose: () => void; onCre
               fontSize: 15, fontWeight: 600, cursor: 'pointer'
             }}>Отмена</button>
             <button
-              onClick={() => name.trim() && onCreate(name.trim(), isPublic)}
+              onClick={() => name.trim() && onCreate(name.trim())}
               disabled={!name.trim()}
               style={{
                 flex: 1, padding: 14, borderRadius: 12, border: 'none',
@@ -239,52 +201,6 @@ function CreateWishlistModal({ onClose, onCreate }: { onClose: () => void; onCre
                 fontSize: 15, fontWeight: 600, cursor: 'pointer', opacity: name.trim() ? 1 : 0.5
               }}>Создать</button>
           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SharedWishlistDetail({ wishlist, onClose }: { wishlist: SharedWishlist; onClose: () => void }) {
-  const [products, setProducts] = useState<Product[]>([])
-  const { show } = useToast()
-
-  useEffect(() => {
-    supabase
-      .from('shared_wishlist_items')
-      .select('products(*)')
-      .eq('wishlist_id', wishlist.id)
-      .then(({ data }) => {
-        setProducts((data?.map((d: { products: unknown }) => d.products as Product).filter(Boolean)) || [])
-      })
-  }, [wishlist.id])
-
-  return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-sheet" style={{ maxWidth: 430 }}>
-        <div className="modal-handle" />
-        <div className="modal-header">
-          <div className="modal-title">{wishlist.name}</div>
-          <button className="modal-close" onClick={onClose}><X size={14} /></button>
-        </div>
-        <div className="modal-body" style={{ padding: 16 }}>
-          {products.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {products.map(p => (
-                <div key={p.id} style={{ background: 'var(--surface2)', borderRadius: 14, overflow: 'hidden' }}>
-                  <img src={p.image_url || ''} alt={p.title} style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', objectPosition: 'top' }} />
-                  <div style={{ padding: '8px 10px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 2 }}>{p.brand}</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{p.price.toLocaleString('ru-RU')} ₽</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text2)' }}>
-              Добавьте товары в этот вишлист
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -300,108 +216,74 @@ function ActivityIcon({ activity }: { activity: string }) {
 
 export default function FriendsPage() {
   const [tab, setTab] = useState('Активность')
-  const [friends, setFriends] = useState<Friend[]>([])
-  const [sharedWishlists, setSharedWishlists] = useState<SharedWishlist[]>([])
+  const [friends, setFriends] = useState<FriendData[]>([])
+  const [sharedWishlists, setSharedWishlists] = useState<SharedWishlistData[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null)
+  const [selectedFriend, setSelectedFriend] = useState<FriendData | null>(null)
   const [showAddFriend, setShowAddFriend] = useState(false)
   const [showCreateWishlist, setShowCreateWishlist] = useState(false)
-  const [selectedWishlist, setSelectedWishlist] = useState<SharedWishlist | null>(null)
   const [copied, setCopied] = useState(false)
+  const [referralCode, setReferralCode] = useState('')
   const { show, node } = useToast()
+  const navigate = useNavigate()
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  useEffect(() => { loadData() }, [])
 
   async function loadData() {
-    const [{ data: friendsData }, { data: swData }] = await Promise.all([
-      supabase.from('friends').select('*').order('created_at', { ascending: false }),
-      supabase.from('shared_wishlists').select('*').order('created_at', { ascending: false }),
-    ])
-
-    setFriends(friendsData || [])
-
-    // Get additional info for shared wishlists
-    if (swData && swData.length > 0) {
-      const withCounts = await Promise.all((swData as SharedWishlist[]).map(async (w) => {
-        const [{ count: memberCount }, { data: items }] = await Promise.all([
-          supabase.from('shared_wishlist_members').select('*', { count: 'exact', head: true }).eq('wishlist_id', w.id),
-          supabase.from('shared_wishlist_items').select('products(image_url)').eq('wishlist_id', w.id).limit(3),
-        ])
-        return {
-          ...w,
-          member_count: (memberCount || 0) + 1,
-          product_count: items?.length || 0,
-          preview_images: items?.map((i: { products: { image_url: string } | null }) => i.products?.image_url).filter(Boolean) || [],
-        }
-      }))
-      setSharedWishlists(withCounts)
+    setLoading(true)
+    try {
+      const [friendsData, swData, me] = await Promise.all([
+        fetchFriends(), fetchSharedWishlists(), fetchMe(),
+      ])
+      setFriends(friendsData)
+      setSharedWishlists(swData)
+      setReferralCode(me.referral_code)
+    } catch (e) {
+      console.error('load friends data failed', e)
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   async function addFriend(name: string, handle?: string) {
-    const colors = ['#EF4444', '#F97316', '#FBBF24', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899']
-    const color = colors[Math.floor(Math.random() * colors.length)]
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-
-    const { error } = await supabase.from('friends').insert({
-      friend_name: name,
-      friend_handle: handle || null,
-      friend_avatar_color: color,
-      friend_initials: initials,
-      last_activity: 'Только что добавлен(а)',
-      activity_time: 'сейчас',
-    })
-
-    if (!error) {
-      loadData()
+    try {
+      const friend = await apiAddFriend(name, handle)
+      setFriends(prev => [friend, ...prev])
       setShowAddFriend(false)
       show('Друг добавлен!')
+    } catch (e) {
+      console.error('add friend failed', e)
     }
   }
 
-  async function createWishlist(name: string, isPublic: boolean) {
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      // Create without owner for anonymous
-      const { error } = await supabase.from('shared_wishlists').insert({
-        name,
-        is_public: isPublic,
-      })
-      if (!error) {
-        loadData()
-        setShowCreateWishlist(false)
-        show('Вишлист создан!')
-      }
-    } else {
-      const { error } = await supabase.from('shared_wishlists').insert({
-        name,
-        owner_id: user.id,
-        is_public: isPublic,
-      })
-      if (!error) {
-        loadData()
-        setShowCreateWishlist(false)
-        show('Вишлист создан!')
-      }
+  async function createWishlist(name: string) {
+    try {
+      const sw = await createSharedWishlist(name)
+      setSharedWishlists(prev => [sw, ...prev])
+      setShowCreateWishlist(false)
+      show('Вишлист создан!')
+      navigate(`/shared/${sw.id}`)
+    } catch (e) {
+      console.error('create wishlist failed', e)
     }
   }
 
   async function removeFriend(id: string) {
-    await supabase.from('friends').delete().eq('id', id)
-    setFriends(prev => prev.filter(f => f.id !== id))
-    show('Друг удалён')
+    try {
+      await apiRemoveFriend(id)
+      setFriends(prev => prev.filter(f => f.id !== id))
+      show('Друг удалён')
+    } catch (e) {
+      console.error('remove friend failed', e)
+    }
   }
 
-  const referralLink = typeof window !== 'undefined'
-    ? `${window.location.origin}?ref=your_code`
+  const referralLink = typeof window !== 'undefined' && referralCode
+    ? `${window.location.origin}?ref=${referralCode}`
     : ''
 
   async function copyReferralLink() {
+    if (!referralLink) return
     try {
       await navigator.clipboard.writeText(referralLink)
       setCopied(true)
@@ -415,8 +297,13 @@ export default function FriendsPage() {
   return (
     <div className="page-bg" style={{ paddingBottom: 20 }}>
       {node}
-      {selectedFriend && <FriendSheet friend={selectedFriend} onClose={() => setSelectedFriend(null)} />}
-      {selectedWishlist && <SharedWishlistDetail wishlist={selectedWishlist} onClose={() => setSelectedWishlist(null)} />}
+      {selectedFriend && (
+        <FriendSheet
+          friend={selectedFriend}
+          onClose={() => setSelectedFriend(null)}
+          onCreatedWishlist={id => { setSelectedFriend(null); navigate(`/shared/${id}`) }}
+        />
+      )}
       {showAddFriend && <AddFriendModal onClose={() => setShowAddFriend(false)} onAdd={addFriend} />}
       {showCreateWishlist && <CreateWishlistModal onClose={() => setShowCreateWishlist(false)} onCreate={createWishlist} />}
 
@@ -548,7 +435,7 @@ export default function FriendsPage() {
               {sharedWishlists.map(wl => (
                 <div
                   key={wl.id}
-                  onClick={() => setSelectedWishlist(wl)}
+                  onClick={() => navigate(`/shared/${wl.id}`)}
                   style={{
                     background: 'var(--surface)',
                     borderRadius: 20,
@@ -558,7 +445,7 @@ export default function FriendsPage() {
                     transition: 'transform 0.15s',
                   }}
                 >
-                  {wl.preview_images && wl.preview_images.length > 0 && (
+                  {wl.preview_images.length > 0 && (
                     <div style={{ display: 'flex', height: 90, overflow: 'hidden', gap: 2 }}>
                       {wl.preview_images.map((url, j) => (
                         <div key={j} style={{ flex: 1, background: 'var(--surface2)' }}>
@@ -571,11 +458,10 @@ export default function FriendsPage() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
                         {wl.name}
-                        {wl.is_public && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--accent)' }}>Публичный</span>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text2)' }}>
                         <Users size={12} />
-                        {wl.member_count || 1} участника · {(wl.product_count || 0)} товаров
+                        {wl.member_count} участника · {wl.product_count} товаров
                       </div>
                     </div>
                     <div style={{
