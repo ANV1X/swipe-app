@@ -3,7 +3,7 @@
 // Никакого Supabase — все данные живут в реальной базе данных на сервере.
 // ─────────────────────────────────────────────────────────────────────────
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://honest-reflection-production-3f73.up.railway.app'
 
 let _initData = ''
 export function setInitData(d: string) { _initData = d }
