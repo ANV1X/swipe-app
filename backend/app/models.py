@@ -3,7 +3,7 @@ import secrets
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, String, Integer, Boolean, DateTime, ForeignKey, Text, UniqueConstraint, BigInteger
+    Column, String, Integer, BigInteger, Boolean, DateTime, ForeignKey, Text, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 
@@ -25,7 +25,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True)  # telegram_id как строка, либо анонимный uuid
-    telegram_id = Column(BigInteger, nullable=True, unique=True, index=True)    
+    telegram_id = Column(BigInteger, nullable=True, unique=True, index=True)
     username = Column(String, nullable=True)
     first_name = Column(String, default="Гость")
     is_admin = Column(Boolean, default=False)
