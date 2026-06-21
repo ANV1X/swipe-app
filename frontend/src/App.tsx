@@ -14,7 +14,7 @@ import SettingsPage from './pages/SettingsPage'
 import OnboardingPage from './pages/OnboardingPage'
 import AdminPage from './pages/AdminPage'
 import { SharedWishlistList, SharedWishlistDetail, SharedWishlistCreate } from './pages/SharedWishlist'
-import { setInitData, fetchUnreadCount, fetchMe, registerReferral } from './api/client'
+import { setInitData, fetchUnreadCount, fetchMe, fetchProfile, registerReferral, connectFriend } from './api/client'
 import { useTelegram } from './hooks/useTelegram'
 import { ThemeProvider } from './lib/theme'
 import './styles.css'
@@ -62,9 +62,14 @@ function AppShell() {
           const refCode = params.get('ref') || startParam
           if (refCode && refCode !== me.referral_code) {
             registerReferral(refCode).catch(() => {})
+            connectFriend(refCode).catch(() => {})
           }
           localStorage.setItem('referral_handled', '1')
         }
+
+        // Прогреваем кэш профиля заранее — когда пользователь откроет
+        // вкладку «Профиль», данные уже будут готовы, без спиннера.
+        fetchProfile().catch(() => {})
       })
       .catch(() => {})
       .finally(() => setCheckingUser(false))

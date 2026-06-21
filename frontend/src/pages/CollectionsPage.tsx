@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, ChevronRight, ArrowLeft, Check, X } from 'lucide-react'
+import { Plus, Search, ChevronRight, ArrowLeft, Check, X, Share2, Swords } from 'lucide-react'
 import {
   fetchCollections, fetchCollectionItems, createCollection,
   subscribeCollection, unsubscribeCollection,
   addCollectionItem, removeCollectionItem, fetchWishlist, fetchMe,
-  formatPrice, CollectionData, Product, WishlistItem,
+  fetchFriends, shareCollectionToFriend, submitToBattle,
+  formatPrice, CollectionData, CollectionTab, Product, WishlistItem, FriendData,
 } from '../api/client'
 import { useToast } from '../components/Toast'
 
@@ -82,11 +83,76 @@ function AddItemModal({ collectionId, existingIds, onClose, onAdded }: {
   )
 }
 
+function ShareToFriendModal({ collectionId, onClose }: { collectionId: string; onClose: () => void }) {
+  const [friends, setFriends] = useState<FriendData[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const { show } = useToast()
+
+  useEffect(() => {
+    fetchFriends().then(setFriends).catch(console.error).finally(() => setLoading(false))
+  }, [])
+
+  async function send(friendId: string, name: string) {
+    setBusyId(friendId)
+    try {
+      await shareCollectionToFriend(friendId, collectionId)
+      show(`Поделились с ${name}!`)
+      onClose()
+    } catch (e) {
+      console.error('share collection failed', e)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal-sheet">
+        <div className="modal-handle" />
+        <div className="modal-header">
+          <h3 className="modal-title">Поделиться коллекцией</h3>
+          <button className="modal-close" onClick={onClose}><X size={14} /></button>
+        </div>
+        <div className="modal-body" style={{ padding: '4px 16px 20px' }}>
+          {loading ? (
+            <div className="page-center" style={{ minHeight: '20vh' }}><div className="spinner" /></div>
+          ) : friends.length === 0 ? (
+            <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text2)', fontSize: 14 }}>
+              Сначала добавьте друзей на вкладке «Друзья»
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, opacity: busyId ? 0.6 : 1 }}>
+              {friends.map(f => (
+                <div
+                  key={f.id}
+                  onClick={() => !busyId && send(f.id, f.first_name)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12,
+                    background: 'var(--surface2)', cursor: 'pointer',
+                  }}
+                >
+                  <div style={{
+                    width: 36, height: 36, borderRadius: '50%', background: f.avatar_color, color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700,
+                  }}>{f.initials}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{f.first_name}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CollectionDetail({ collection, onBack, onChange }: DetailProps) {
   const [items, setItems] = useState<Product[]>([])
   const [busy, setBusy] = useState(false)
   const [myUserId, setMyUserId] = useState('')
   const [showAddItem, setShowAddItem] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const { show, node } = useToast()
 
   useEffect(() => {
@@ -121,6 +187,16 @@ function CollectionDetail({ collection, onBack, onChange }: DetailProps) {
     }
   }
 
+  async function handleSubmitToBattle() {
+    try {
+      const result = await submitToBattle(collection.id)
+      show(result.status === 'matched' ? 'Соперник найден — батл начался! 🔥' : 'Коллекция в очереди на батл')
+    } catch (e) {
+      console.error('submit to battle failed', e)
+      show('Не удалось отправить на батл')
+    }
+  }
+
   const initials = collection.author_name.slice(0, 2).toUpperCase()
 
   return (
@@ -134,16 +210,22 @@ function CollectionDetail({ collection, onBack, onChange }: DetailProps) {
           onAdded={setItems}
         />
       )}
+      {showShare && <ShareToFriendModal collectionId={collection.id} onClose={() => setShowShare(false)} />}
       <div className="page-header">
         <button className="back-btn" onClick={onBack}><ArrowLeft size={18} /></button>
         <div style={{ flex: 1, textAlign: 'center' }}>
           <div style={{ fontSize: 17, fontWeight: 700 }}>{collection.name}</div>
         </div>
-        {isAuthor ? (
-          <button className="header-action-btn" onClick={() => setShowAddItem(true)}><Plus size={20} /></button>
-        ) : (
-          <div style={{ width: 36 }} />
-        )}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="header-action-btn" onClick={() => setShowShare(true)} title="Поделиться">
+            <Share2 size={18} />
+          </button>
+          {isAuthor && (
+            <button className="header-action-btn" onClick={() => setShowAddItem(true)} title="Добавить товар">
+              <Plus size={20} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="collection-detail-hero">
@@ -152,19 +234,40 @@ function CollectionDetail({ collection, onBack, onChange }: DetailProps) {
           <div className="collection-detail-author">by {collection.author_name}</div>
           <div className="collection-detail-name">{formatSubs(collection.subscribers_count)}</div>
         </div>
+        {collection.is_official && (
+          <span style={{
+            marginLeft: 'auto', background: 'var(--accent-light)', color: 'var(--accent)',
+            fontSize: 11, fontWeight: 700, borderRadius: 8, padding: '4px 8px',
+          }}>Официальная</span>
+        )}
       </div>
 
       <div className="collection-detail-count">{items.length} товаров</div>
 
-      <button
-        className={`collection-subscribe-btn${collection.is_subscribed ? ' subscribed' : ''}`}
-        onClick={handleSubscribe}
-        disabled={busy}
-      >
-        {collection.is_subscribed
-          ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Check size={16} /> Вы подписаны</span>
-          : 'Подписаться'}
-      </button>
+      <div style={{ display: 'flex', gap: 8, padding: '0 16px 12px' }}>
+        <button
+          className={`collection-subscribe-btn${collection.is_subscribed ? ' subscribed' : ''}`}
+          onClick={handleSubscribe}
+          disabled={busy}
+          style={{ flex: 1, margin: 0 }}
+        >
+          {collection.is_subscribed
+            ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Check size={16} /> Вы подписаны</span>
+            : 'Подписаться'}
+        </button>
+        {isAuthor && items.length > 0 && (
+          <button
+            onClick={handleSubmitToBattle}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              background: 'var(--surface2)', color: 'var(--text)', border: 'none', borderRadius: 14,
+              fontWeight: 600, fontSize: 14, cursor: 'pointer',
+            }}
+          >
+            <Swords size={16} /> На батл
+          </button>
+        )}
+      </div>
 
       {items.length === 0 ? (
         <div className="page-center" style={{ minHeight: '20vh' }}>
@@ -202,16 +305,18 @@ function CollectionDetail({ collection, onBack, onChange }: DetailProps) {
   )
 }
 
-const TABS: { label: string; key: 'popular' | 'new' | 'subscribed' }[] = [
+const TABS: { label: string; key: CollectionTab }[] = [
   { label: 'Популярные', key: 'popular' },
   { label: 'Новинки', key: 'new' },
+  { label: 'Официальные', key: 'official' },
+  { label: 'От пользователей', key: 'community' },
   { label: 'Подписки', key: 'subscribed' },
 ]
 
 export default function CollectionsPage() {
   const [collections, setCollections] = useState<CollectionData[]>([])
   const [query, setQuery] = useState('')
-  const [tab, setTab] = useState<'popular' | 'new' | 'subscribed'>('popular')
+  const [tab, setTab] = useState<CollectionTab>('popular')
   const [selected, setSelected] = useState<CollectionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)

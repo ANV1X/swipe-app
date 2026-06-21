@@ -14,6 +14,8 @@ class ProductOut(BaseModel):
     external_url: str
     category: str
     gender: str | None
+    style: str | None
+    color: str | None
     discount_pct: int | None
 
     class Config:
@@ -94,6 +96,7 @@ class CollectionOut(BaseModel):
     subscribers_count: int
     items_count: int
     is_subscribed: bool
+    is_official: bool
     created_at: datetime
 
 
@@ -104,14 +107,25 @@ class CollectionCreate(BaseModel):
 
 
 # ─── Battles ───────────────────────────────────────────────────────────────
+class BattleCollectionSide(BaseModel):
+    id: str
+    name: str
+    cover_image: str | None
+    author_name: str
+    items_count: int
+    preview_images: list[str]
+
+
 class BattleOut(BaseModel):
     id: str
     active: bool
     votes_a: int
     votes_b: int
+    prize_emoji: str
+    prize_title: str | None
     created_at: datetime
-    product_a: ProductOut
-    product_b: ProductOut
+    collection_a: BattleCollectionSide
+    collection_b: BattleCollectionSide
     my_vote: str | None = None
 
 
@@ -120,25 +134,34 @@ class BattleVoteIn(BaseModel):
 
 
 class BattleCreate(BaseModel):
-    product_a_id: str
-    product_b_id: str
+    collection_a_id: str
+    collection_b_id: str
+    prize_title: str | None = None
+    prize_emoji: str = "🏆"
+
+
+class BattleSubmissionIn(BaseModel):
+    collection_id: str
+
+
+class BattleSubmissionOut(BaseModel):
+    status: str  # "waiting" | "matched"
+    battle_id: str | None = None
 
 
 # ─── Friends ───────────────────────────────────────────────────────────────
 class FriendOut(BaseModel):
-    id: str
-    friend_name: str
-    friend_handle: str | None
-    friend_avatar_color: str
-    friend_initials: str | None
+    id: str  # id пользователя-друга
+    first_name: str
+    username: str | None
+    avatar_color: str
+    initials: str
     last_activity: str | None
-    activity_time: str | None
-    created_at: datetime
+    since: datetime
 
 
-class FriendCreate(BaseModel):
-    friend_name: str
-    friend_handle: str | None = None
+class FriendConnectIn(BaseModel):
+    code: str
 
 
 # ─── Notifications ─────────────────────────────────────────────────────────
@@ -148,8 +171,21 @@ class NotificationOut(BaseModel):
     title: str
     body: str
     product_id: str | None
+    collection_id: str | None
+    from_user_id: str | None
+    from_user_name: str | None = None
     read: bool
     created_at: datetime
+
+
+class ShareProductIn(BaseModel):
+    friend_id: str
+    product_id: str
+
+
+class ShareCollectionIn(BaseModel):
+    friend_id: str
+    collection_id: str
 
 
 # ─── Shared wishlists ──────────────────────────────────────────────────────

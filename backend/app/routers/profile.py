@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth import get_current_user, is_admin_user
-from app.models import Swipe, Wishlist, Product, User, Friend, Referral
+from app.models import Swipe, Wishlist, Product, User, FriendConnection, Referral
 from app.schemas import ProfileOut, AchievementOut
 
 router = APIRouter(prefix="/profile", tags=["profile"])
@@ -62,8 +62,11 @@ def get_profile(db: Session = Depends(get_db), user: User = Depends(get_current_
     fav_marketplace = marketplaces.most_common(1)[0][0] if marketplaces else None
     has_discount_save = any(p.price_old for p in wishlist_products)
 
+    from sqlalchemy import or_
     friends_count = db.scalar(
-        select(func.count()).select_from(Friend).where(Friend.user_id == user.id)
+        select(func.count()).select_from(FriendConnection).where(
+            or_(FriendConnection.user_a_id == user.id, FriendConnection.user_b_id == user.id)
+        )
     ) or 0
     referral_count = db.scalar(
         select(func.count()).select_from(Referral).where(Referral.referrer_id == user.id)

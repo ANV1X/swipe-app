@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   fetchAdminStats, exportAdminUsers, exportAdminSwipes, exportAdminBattles, exportAdminAll,
-  createBattle, createCollection, fetchProducts, fetchMe, Product as ApiProduct,
+  createBattle, createCollection, fetchCollections, fetchMe, CollectionData,
 } from '../api/client'
 import {
   Users, Heart, Bookmark, Swords, Share2, Download, FileText,
@@ -15,9 +15,10 @@ interface Stats {
   wishlist: Record<string, number>
   sharedWishlists: Record<string, number>
   referrals: Record<string, number>
+  social: Record<string, number>
 }
 
-type Product = Pick<ApiProduct, 'id' | 'title' | 'brand' | 'price' | 'image_url'>
+type CollectionOption = Pick<CollectionData, 'id' | 'name' | 'author_name' | 'cover_image'>
 
 export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -291,6 +292,20 @@ export default function AdminPage() {
                 <DetailStat label="Уникальных приглашающих" value={getStat('referrals', 'unique_referrers')} />
               </div>
             </StatsSection>
+
+            <StatsSection
+              title="Друзья и коллекции"
+              icon={<Users size={20} />}
+              color="blue"
+              isExpanded={expandedSection === 'social'}
+              onToggle={() => setExpandedSection(expandedSection === 'social' ? null : 'social')}
+            >
+              <div className="detail-grid">
+                <DetailStat label="Связей дружбы" value={getStat('social', 'total_friend_connections')} highlight />
+                <DetailStat label="Всего коллекций" value={getStat('social', 'total_collections')} />
+                <DetailStat label="Официальных" value={getStat('social', 'official_collections')} />
+              </div>
+            </StatsSection>
           </div>
         </>
       )}
@@ -351,20 +366,22 @@ function DetailStat({ label, value, highlight = false }: { label: string; value:
 }
 
 function CreateBattleModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [products, setProducts] = useState<Product[]>([])
-  const [productA, setProductA] = useState<string>('')
-  const [productB, setProductB] = useState<string>('')
+  const [collections, setCollections] = useState<CollectionOption[]>([])
+  const [collA, setCollA] = useState<string>('')
+  const [collB, setCollB] = useState<string>('')
+  const [prizeTitle, setPrizeTitle] = useState('')
+  const [prizeEmoji, setPrizeEmoji] = useState('🏆')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetchProducts({}).then(data => setProducts(data.slice(0, 100))).catch(console.error)
+    fetchCollections('new').then(data => setCollections(data.slice(0, 100))).catch(console.error)
   }, [])
 
   async function create() {
-    if (!productA || !productB || productA === productB) return
+    if (!collA || !collB || collA === collB) return
     setLoading(true)
     try {
-      await createBattle(productA, productB)
+      await createBattle(collA, collB, prizeTitle || undefined, prizeEmoji || '🏆')
       onCreated()
       onClose()
     } catch (e) {
@@ -384,25 +401,37 @@ function CreateBattleModal({ onClose, onCreated }: { onClose: () => void; onCrea
         <div className="battle-selects">
           {['A', 'B'].map(side => (
             <div key={side} className="battle-select">
-              <label>Товар {side}</label>
+              <label>Коллекция {side}</label>
               <select
-                value={side === 'A' ? productA : productB}
-                onChange={(e) => side === 'A' ? setProductA(e.target.value) : setProductB(e.target.value)}
+                value={side === 'A' ? collA : collB}
+                onChange={(e) => side === 'A' ? setCollA(e.target.value) : setCollB(e.target.value)}
               >
-                <option value="">Выберите товар</option>
-                {products.filter(p => p.id !== (side === 'A' ? productB : productA)).map(p => (
-                  <option key={p.id} value={p.id}>{p.title.slice(0, 50)} - {p.price}</option>
+                <option value="">Выберите коллекцию</option>
+                {collections.filter(c => c.id !== (side === 'A' ? collB : collA)).map(c => (
+                  <option key={c.id} value={c.id}>{c.name.slice(0, 50)} — {c.author_name}</option>
                 ))}
               </select>
-              {(side === 'A' ? productA : productB) && products.find(p => p.id === (side === 'A' ? productA : productB))?.image_url && (
-                <img src={products.find(p => p.id === (side === 'A' ? productA : productB))?.image_url ?? undefined} alt="" />
+              {(side === 'A' ? collA : collB) && collections.find(c => c.id === (side === 'A' ? collA : collB))?.cover_image && (
+                <img src={collections.find(c => c.id === (side === 'A' ? collA : collB))?.cover_image ?? undefined} alt="" />
               )}
             </div>
           ))}
         </div>
+        <div className="form-fields" style={{ padding: '0 20px 16px', display: 'flex', gap: 8 }}>
+          <input
+            type="text" value={prizeEmoji} onChange={(e) => setPrizeEmoji(e.target.value)}
+            placeholder="🏆" style={{ width: 56, textAlign: 'center', flexShrink: 0 }}
+            maxLength={4}
+          />
+          <input
+            type="text" value={prizeTitle} onChange={(e) => setPrizeTitle(e.target.value)}
+            placeholder="Приз победителю (например, скидка 1000₽)"
+            style={{ flex: 1 }}
+          />
+        </div>
         <div className="modal-actions">
           <button onClick={onClose} className="btn secondary">Отмена</button>
-          <button onClick={create} disabled={!productA || !productB || productA === productB || loading} className="btn primary">
+          <button onClick={create} disabled={!collA || !collB || collA === collB || loading} className="btn primary">
             {loading ? 'Создание...' : 'Создать батл'}
           </button>
         </div>

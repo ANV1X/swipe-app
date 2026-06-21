@@ -1,21 +1,50 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth import get_current_user
-from app.models import Battle, BattleVote, Product, User
-from app.schemas import BattleOut, BattleVoteIn, BattleCreate
-from app.utils import product_to_out
+from app.models import (
+    Battle, BattleVote, BattleSubmission, Collection, CollectionItem, Product, User, Notification
+)
+from app.schemas import BattleOut, BattleVoteIn, BattleCreate, BattleSubmissionIn, BattleSubmissionOut, BattleCollectionSide
 
 router = APIRouter(prefix="/battles", tags=["battles"])
 
+DEFAULT_PRIZES = [
+    ("🏆", "Слава и место в топе недели"),
+    ("🎁", "Промокод на скидку 500₽"),
+    ("💎", "Бейдж «Икона стиля» в профиле"),
+]
 
-def _to_out(b: Battle, pa: Product, pb: Product, my_vote: str | None) -> BattleOut:
+
+def _collection_side(db: Session, collection_id: str) -> BattleCollectionSide | None:
+    c = db.get(Collection, collection_id)
+    if not c:
+        return None
+    items = db.scalars(
+        select(Product).join(CollectionItem, CollectionItem.product_id == Product.id)
+        .where(CollectionItem.collection_id == collection_id).limit(4)
+    ).all()
+    items_count = db.scalar(
+        select(func.count()).select_from(CollectionItem).where(CollectionItem.collection_id == collection_id)
+    ) or 0
+    cover = c.cover_image or (items[0].image_url if items else None)
+    return BattleCollectionSide(
+        id=c.id, name=c.name, cover_image=cover, author_name=c.author_name,
+        items_count=items_count, preview_images=[i.image_url for i in items],
+    )
+
+
+def _to_out(db: Session, b: Battle, my_vote: str | None) -> BattleOut | None:
+    side_a = _collection_side(db, b.collection_a_id)
+    side_b = _collection_side(db, b.collection_b_id)
+    if not side_a or not side_b:
+        return None
     return BattleOut(
         id=b.id, active=b.active, votes_a=b.votes_a, votes_b=b.votes_b,
-        created_at=b.created_at, product_a=product_to_out(pa), product_b=product_to_out(pb),
-        my_vote=my_vote,
+        prize_emoji=b.prize_emoji, prize_title=b.prize_title,
+        created_at=b.created_at, collection_a=side_a, collection_b=side_b, my_vote=my_vote,
     )
 
 
@@ -24,14 +53,10 @@ def get_active_battle(db: Session = Depends(get_db), user: User = Depends(get_cu
     battle = db.scalar(select(Battle).where(Battle.active.is_(True)).order_by(Battle.created_at.desc()))
     if not battle:
         return None
-    pa = db.get(Product, battle.product_a_id)
-    pb = db.get(Product, battle.product_b_id)
-    if not pa or not pb:
-        return None
     vote = db.scalar(
         select(BattleVote).where(BattleVote.battle_id == battle.id, BattleVote.user_id == user.id)
     )
-    return _to_out(battle, pa, pb, vote.choice if vote else None)
+    return _to_out(db, battle, vote.choice if vote else None)
 
 
 @router.post("/{battle_id}/vote", response_model=BattleOut)
@@ -55,19 +80,113 @@ def vote(
     db.commit()
     db.refresh(battle)
 
-    pa = db.get(Product, battle.product_a_id)
-    pb = db.get(Product, battle.product_b_id)
-    return _to_out(battle, pa, pb, body.choice)
+    out = _to_out(db, battle, body.choice)
+    if not out:
+        raise HTTPException(status_code=404, detail="Collection in battle was deleted")
+    return out
 
 
 @router.post("/", response_model=BattleOut)
 def create_battle(body: BattleCreate, db: Session = Depends(get_db)):
-    pa = db.get(Product, body.product_a_id)
-    pb = db.get(Product, body.product_b_id)
-    if not pa or not pb:
-        raise HTTPException(status_code=404, detail="Product not found")
-    battle = Battle(product_a_id=body.product_a_id, product_b_id=body.product_b_id, active=True)
+    a = db.get(Collection, body.collection_a_id)
+    b = db.get(Collection, body.collection_b_id)
+    if not a or not b:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    battle = Battle(
+        collection_a_id=body.collection_a_id, collection_b_id=body.collection_b_id,
+        prize_title=body.prize_title, prize_emoji=body.prize_emoji, active=True,
+    )
     db.add(battle)
     db.commit()
     db.refresh(battle)
-    return _to_out(battle, pa, pb, None)
+    out = _to_out(db, battle, None)
+    if not out:
+        raise HTTPException(status_code=500, detail="Failed to build battle")
+    return out
+
+
+@router.post("/submit", response_model=BattleSubmissionOut)
+def submit_collection(
+    body: BattleSubmissionIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Пользователь предлагает свою коллекцию для батла. Если в очереди уже
+    есть чья-то ещё коллекция — сразу создаём батл (мэтчим заявки)."""
+    collection = db.get(Collection, body.collection_id)
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    if collection.author_id != user.id:
+        raise HTTPException(status_code=403, detail="You can only submit your own collections")
+
+    already = db.scalar(
+        select(BattleSubmission).where(
+            BattleSubmission.collection_id == body.collection_id, BattleSubmission.status == "pending"
+        )
+    )
+    if already:
+        return BattleSubmissionOut(status="waiting")
+
+    opponent = db.scalar(
+        select(BattleSubmission)
+        .where(BattleSubmission.status == "pending", BattleSubmission.user_id != user.id)
+        .order_by(BattleSubmission.created_at)
+    )
+
+    my_submission = BattleSubmission(collection_id=body.collection_id, user_id=user.id, status="pending")
+    db.add(my_submission)
+    db.flush()
+
+    if not opponent:
+        db.commit()
+        return BattleSubmissionOut(status="waiting")
+
+    import random
+    emoji, title = random.choice(DEFAULT_PRIZES)
+    battle = Battle(
+        collection_a_id=opponent.collection_id, collection_b_id=body.collection_id,
+        prize_emoji=emoji, prize_title=title, active=True,
+    )
+    # деактивируем предыдущий батл, чтобы на экране всегда был один активный
+    db.execute(
+        Battle.__table__.update().where(Battle.active.is_(True)).values(active=False)
+    )
+    db.add(battle)
+    db.flush()
+
+    opponent.status = "matched"
+    opponent.battle_id = battle.id
+    my_submission.status = "matched"
+    my_submission.battle_id = battle.id
+
+    opponent_user = db.get(User, opponent.user_id)
+    if opponent_user and opponent_user.notif_battles:
+        db.add(Notification(
+            user_id=opponent_user.id, type="battle_matched",
+            title="Ваш батл начался!", collection_id=opponent.collection_id,
+            body=f"Коллекция «{collection.name}» бросает вызов вашей. Голосуем!",
+        ))
+    if user.notif_battles:
+        db.add(Notification(
+            user_id=user.id, type="battle_matched",
+            title="Ваш батл начался!", collection_id=body.collection_id,
+            body="Соперник найден — ваша коллекция уже участвует в батле!",
+        ))
+
+    db.commit()
+    return BattleSubmissionOut(status="matched", battle_id=battle.id)
+
+
+@router.delete("/submit/{collection_id}")
+def cancel_submission(
+    collection_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    sub = db.scalar(
+        select(BattleSubmission).where(
+            BattleSubmission.collection_id == collection_id,
+            BattleSubmission.user_id == user.id,
+            BattleSubmission.status == "pending",
+        )
+    )
+    if sub:
+        db.delete(sub)
+        db.commit()
+    return {"ok": True}

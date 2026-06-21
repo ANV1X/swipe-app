@@ -12,8 +12,12 @@ from app.models import Product, Collection, CollectionItem, Battle, PriceHistory
 
 random.seed(42)
 
-BRANDS = ["Zarina", "Lime", "Befree", "Mango", "H&M", "COS", "Massimo Dutti",
-          "Nike", "Adidas", "New Balance", "Reserved", "Gloria Jeans", "12Storeez", "Vans"]
+BRANDS = ["Zara", "H&M", "Uniqlo", "COS", "Mango", "New Balance", "Nike", "Adidas", "Reserved", "Pull&Bear"]
+
+# Те же id, что и в анкете онбординга (см. OnboardingPage.tsx) — чтобы фильтры
+# и персонализация реально совпадали со вкусом, который выбирает пользователь.
+STYLES = ["minimal", "casual", "street", "smart", "sport", "romantic", "dark", "boho"]
+COLORS = ["black", "white", "beige", "khaki", "navy", "gray", "brown", "green", "pink", "red"]
 
 CLOTHES = {
     "female": ["Платье миди", "Юбка плиссе", "Блузка шёлковая", "Кардиган оверсайз",
@@ -71,6 +75,8 @@ def _make_products(n_per_group: int = 6) -> list[Product]:
                     external_url=f"https://example.com/product/{img_counter}",
                     category=category,
                     gender=gender,
+                    style=random.choice(STYLES),
+                    color=random.choice(COLORS),
                     discount_pct=discount_pct,
                 ))
     random.shuffle(products)
@@ -117,21 +123,28 @@ def seed_database(db: Session) -> None:
         ("Уличная мода", "Street Vibes", "@streetvibes"),
         ("Капсула на лето", "Капсула.рф", "@kapsula"),
     ]
+    seeded_collections: list[Collection] = []
     for name, author_name, handle in collections_meta:
         c = Collection(
             name=name, author_name=author_name, author_handle=handle,
             cover_image=random.choice(products).image_url,
             subscribers_count=random.randint(120, 4200),
+            is_official=True,  # это встроенные подборки Swipe, не пользовательские
         )
         db.add(c)
         db.flush()
         picks = random.sample(products, k=min(8, len(products)))
         for p in picks:
             db.add(CollectionItem(collection_id=c.id, product_id=p.id))
+        seeded_collections.append(c)
 
-    # Один активный батл для старта
-    a, b = random.sample(products, 2)
-    db.add(Battle(product_a_id=a.id, product_b_id=b.id, votes_a=random.randint(5, 40),
-                  votes_b=random.randint(5, 40), active=True))
+    # Один активный батл для старта — официальная коллекция vs официальная
+    a, b = random.sample(seeded_collections, 2)
+    db.add(Battle(
+        collection_a_id=a.id, collection_b_id=b.id,
+        votes_a=random.randint(5, 40), votes_b=random.randint(5, 40),
+        prize_emoji="🎁", prize_title="Промокод на скидку 1000₽ у партнёра",
+        active=True,
+    ))
 
     db.commit()

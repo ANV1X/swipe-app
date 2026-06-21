@@ -4,12 +4,12 @@ import { useNavigate } from 'react-router-dom'
 import NotificationsSheet from '../components/NotificationsSheet'
 import { useToast } from '../components/Toast'
 import { useTheme } from '../lib/theme'
-import { fetchProfile, fetchUnreadCount, ProfileData } from '../api/client'
+import { fetchProfile, fetchUnreadCount, getCachedProfile, ProfileData } from '../api/client'
 
 export default function ProfilePage() {
   const [showNotifs, setShowNotifs] = useState(false)
-  const [profile, setProfile] = useState<ProfileData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<ProfileData | null>(() => getCachedProfile())
+  const [loading, setLoading] = useState(!getCachedProfile())
   const [unread, setUnread] = useState(0)
   const navigate = useNavigate()
   const { node } = useToast()
@@ -18,7 +18,9 @@ export default function ProfilePage() {
   useEffect(() => { load() }, [])
 
   function load() {
-    setLoading(true)
+    // Если в кэше уже есть данные — показываем их сразу и обновляем в фоне,
+    // без мигания спиннером. Если кэша нет (самый первый заход) — короткая
+    // загрузка неизбежна, но App.tsx уже прогревает кэш заранее.
     fetchProfile().then(setProfile).catch(console.error).finally(() => setLoading(false))
     fetchUnreadCount().then(r => setUnread(r.count)).catch(console.error)
   }

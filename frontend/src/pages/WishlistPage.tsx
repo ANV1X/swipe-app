@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Bell, BellOff, ExternalLink, Trash2, ShoppingBag } from 'lucide-react'
+import { Bell, BellOff, ExternalLink, Trash2, ShoppingBag, Share2 } from 'lucide-react'
 import {
   fetchWishlist, removeFromWishlist, updateWishlistNotify,
   formatPrice, marketplaceLabel, WishlistItem,
 } from '../api/client'
 import { useToast } from '../components/Toast'
 import PriceChart from '../components/PriceChart'
+import ShareProductSheet from '../components/ShareProductSheet'
 
 const CATEGORIES = ['Все', 'Одежда', 'Обувь', 'Аксессуары']
 
@@ -13,6 +14,7 @@ export default function WishlistPage() {
   const [items, setItems] = useState<WishlistItem[]>([])
   const [category, setCategory] = useState('Все')
   const [loading, setLoading] = useState(true)
+  const [shareItem, setShareItem] = useState<WishlistItem | null>(null)
   const { show, node } = useToast()
 
   useEffect(() => { load() }, [])
@@ -65,6 +67,13 @@ export default function WishlistPage() {
   return (
     <div className="page-bg">
       {node}
+      {shareItem && (
+        <ShareProductSheet
+          productId={shareItem.product_id}
+          productTitle={shareItem.title}
+          onClose={() => setShareItem(null)}
+        />
+      )}
       <div className="page-header">
         <div className="page-title">
           Вишлист
@@ -146,6 +155,13 @@ export default function WishlistPage() {
                   </div>
                   <button className="wishlist-remove-btn" onClick={() => removeItem(item)}>
                     <Trash2 size={13} />
+                  </button>
+                  <button
+                    className="wishlist-remove-btn"
+                    style={{ right: 46 }}
+                    onClick={() => setShareItem(item)}
+                  >
+                    <Share2 size={13} />
                   </button>
                   <button className="wishlist-buy-btn" onClick={() => buyItem(item)}>
                     <ExternalLink size={12} />

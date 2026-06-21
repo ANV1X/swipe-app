@@ -42,7 +42,9 @@ export interface Product {
   id: string; title: string; brand: string | null
   price: number; price_old: number | null
   image_url: string; marketplace: string; external_url: string
-  category: string; gender: string | null; discount_pct: number | null
+  category: string; gender: string | null
+  style: string | null; color: string | null
+  discount_pct: number | null
 }
 
 export interface Deal extends Product { discount_pct: number }
@@ -79,24 +81,39 @@ export interface CollectionData {
   id: string; name: string; author_id: string | null; author_name: string; author_handle: string | null
   author_avatar: string | null; cover_image: string | null
   subscribers_count: number; items_count: number; is_subscribed: boolean
+  is_official: boolean
   created_at: string
+}
+
+export interface BattleCollectionSide {
+  id: string; name: string; cover_image: string | null
+  author_name: string; items_count: number; preview_images: string[]
 }
 
 export interface BattleData {
   id: string; active: boolean; votes_a: number; votes_b: number
-  created_at: string; product_a: Product; product_b: Product
+  prize_emoji: string; prize_title: string | null
+  created_at: string
+  collection_a: BattleCollectionSide; collection_b: BattleCollectionSide
   my_vote: 'a' | 'b' | null
 }
 
+export interface BattleSubmissionResult {
+  status: 'waiting' | 'matched'
+  battle_id: string | null
+}
+
 export interface FriendData {
-  id: string; friend_name: string; friend_handle: string | null
-  friend_avatar_color: string; friend_initials: string | null
-  last_activity: string | null; activity_time: string | null; created_at: string
+  id: string; first_name: string; username: string | null
+  avatar_color: string; initials: string
+  last_activity: string | null; since: string
 }
 
 export interface NotificationData {
   id: string; type: string; title: string; body: string
-  product_id: string | null; read: boolean; created_at: string
+  product_id: string | null; collection_id: string | null
+  from_user_id: string | null; from_user_name: string | null
+  read: boolean; created_at: string
 }
 
 export interface SharedMember { user_id: string; first_name: string; joined_at: string }
@@ -125,13 +142,21 @@ export interface UserData {
 export type UserUpdate = Partial<Omit<UserData, 'id' | 'telegram_id' | 'username' | 'referral_code' | 'is_admin'>>
 
 // ─── Products ──────────────────────────────────────────────────────────
-export async function fetchProducts(p?: {
+export interface ProductFilters {
   category?: string; price_max?: number; gender?: string
-}): Promise<Product[]> {
+  style?: string; color?: string
+  exclude_swiped?: boolean; personalized?: boolean
+}
+
+export async function fetchProducts(p?: ProductFilters): Promise<Product[]> {
   const q = new URLSearchParams()
   if (p?.category) q.set('category', p.category)
   if (p?.price_max) q.set('price_max', String(p.price_max))
   if (p?.gender) q.set('gender', p.gender)
+  if (p?.style) q.set('style', p.style)
+  if (p?.color) q.set('color', p.color)
+  if (p?.exclude_swiped) q.set('exclude_swiped', 'true')
+  if (p?.personalized === false) q.set('personalized', 'false')
   return request(`/products/?${q}`)
 }
 
@@ -184,8 +209,14 @@ export async function updateWishlistNotify(product_id: string, notify_price_drop
 }
 
 // ─── Collections ───────────────────────────────────────────────────────
-export async function fetchCollections(tab: 'popular' | 'new' | 'subscribed' = 'popular'): Promise<CollectionData[]> {
+export type CollectionTab = 'popular' | 'new' | 'subscribed' | 'official' | 'community'
+
+export async function fetchCollections(tab: CollectionTab = 'popular'): Promise<CollectionData[]> {
   return request(`/collections/?tab=${tab}`)
+}
+
+export async function fetchMyCollections(): Promise<CollectionData[]> {
+  return request('/collections/mine')
 }
 
 export async function fetchCollectionItems(id: string): Promise<Product[]> {
@@ -221,8 +252,21 @@ export async function voteBattle(id: string, choice: 'a' | 'b'): Promise<BattleD
   return request(`/battles/${id}/vote`, { method: 'POST', body: JSON.stringify({ choice }) })
 }
 
-export async function createBattle(product_a_id: string, product_b_id: string): Promise<BattleData> {
-  return request('/battles/', { method: 'POST', body: JSON.stringify({ product_a_id, product_b_id }) })
+export async function createBattle(
+  collection_a_id: string, collection_b_id: string, prize_title?: string, prize_emoji = '🏆'
+): Promise<BattleData> {
+  return request('/battles/', {
+    method: 'POST',
+    body: JSON.stringify({ collection_a_id, collection_b_id, prize_title, prize_emoji }),
+  })
+}
+
+export async function submitToBattle(collectionId: string): Promise<BattleSubmissionResult> {
+  return request('/battles/submit', { method: 'POST', body: JSON.stringify({ collection_id: collectionId }) })
+}
+
+export async function cancelBattleSubmission(collectionId: string) {
+  return request(`/battles/submit/${collectionId}`, { method: 'DELETE' })
 }
 
 // ─── Friends ───────────────────────────────────────────────────────────
@@ -230,12 +274,24 @@ export async function fetchFriends(): Promise<FriendData[]> {
   return request('/friends/')
 }
 
-export async function addFriend(friend_name: string, friend_handle?: string): Promise<FriendData> {
-  return request('/friends/', { method: 'POST', body: JSON.stringify({ friend_name, friend_handle }) })
+export async function connectFriend(code: string): Promise<FriendData> {
+  return request('/friends/connect', { method: 'POST', body: JSON.stringify({ code }) })
 }
 
-export async function removeFriend(id: string) {
-  return request(`/friends/${id}`, { method: 'DELETE' })
+export async function removeFriend(friendUserId: string) {
+  return request(`/friends/${friendUserId}`, { method: 'DELETE' })
+}
+
+export async function shareProductToFriend(friendId: string, productId: string) {
+  return request('/friends/share/product', {
+    method: 'POST', body: JSON.stringify({ friend_id: friendId, product_id: productId }),
+  })
+}
+
+export async function shareCollectionToFriend(friendId: string, collectionId: string) {
+  return request('/friends/share/collection', {
+    method: 'POST', body: JSON.stringify({ friend_id: friendId, collection_id: collectionId }),
+  })
 }
 
 // ─── Notifications ─────────────────────────────────────────────────────
@@ -281,17 +337,32 @@ export async function removeFromSharedWishlist(wishlistId: string, productId: st
 }
 
 // ─── Profile ───────────────────────────────────────────────────────────
+// Простой кэш в памяти модуля — чтобы при повторном заходе на вкладку
+// «Профиль» данные показывались мгновенно, без спиннера, а обновлялись
+// в фоне (stale-while-revalidate).
+let _profileCache: ProfileData | null = null
+export function getCachedProfile(): ProfileData | null { return _profileCache }
+
 export async function fetchProfile(): Promise<ProfileData> {
-  return request('/profile/')
+  const data = await request<ProfileData>('/profile/')
+  _profileCache = data
+  return data
 }
 
 // ─── User / onboarding ─────────────────────────────────────────────────
+let _meCache: UserData | null = null
+export function getCachedMe(): UserData | null { return _meCache }
+
 export async function fetchMe(): Promise<UserData> {
-  return request('/users/me')
+  const data = await request<UserData>('/users/me')
+  _meCache = data
+  return data
 }
 
 export async function updateMe(patch: UserUpdate): Promise<UserData> {
-  return request('/users/me', { method: 'PATCH', body: JSON.stringify(patch) })
+  const data = await request<UserData>('/users/me', { method: 'PATCH', body: JSON.stringify(patch) })
+  _meCache = data
+  return data
 }
 
 export async function registerReferral(code: string): Promise<{ ok: boolean }> {
@@ -330,6 +401,31 @@ export async function fetchPriceHistory(productId: string): Promise<PriceHistory
   return request(`/products/${productId}/price-history`)
 }
 
+// ─── Onboarding taxonomy (используется и в анкете, и в фильтрах ленты) ──
+export const STYLE_OPTIONS = [
+  { id: 'minimal', label: 'Minimal', emoji: '🤍' },
+  { id: 'casual', label: 'Casual', emoji: '👕' },
+  { id: 'street', label: 'Street', emoji: '🧢' },
+  { id: 'smart', label: 'Smart', emoji: '👔' },
+  { id: 'sport', label: 'Sport', emoji: '🏃' },
+  { id: 'romantic', label: 'Romantic', emoji: '🌸' },
+  { id: 'dark', label: 'Dark', emoji: '🖤' },
+  { id: 'boho', label: 'Boho', emoji: '🌿' },
+]
+
+export const COLOR_OPTIONS = [
+  { id: 'black', label: 'Чёрный', hex: '#1C1C1E' },
+  { id: 'white', label: 'Белый', hex: '#F5F5F0', border: true },
+  { id: 'beige', label: 'Бежевый', hex: '#D4C4A8' },
+  { id: 'khaki', label: 'Хаки', hex: '#8B8560' },
+  { id: 'navy', label: 'Синий', hex: '#1A3A6E' },
+  { id: 'gray', label: 'Серый', hex: '#8E8E8E' },
+  { id: 'brown', label: 'Коричневый', hex: '#7B5B3A' },
+  { id: 'green', label: 'Зелёный', hex: '#3A7D44' },
+  { id: 'pink', label: 'Розовый', hex: '#E8849A' },
+  { id: 'red', label: 'Красный', hex: '#C0392B' },
+]
+
 // ─── Helpers ───────────────────────────────────────────────────────────
 export function formatPrice(p: number): string {
   return p.toLocaleString('ru-RU') + ' ₽'
@@ -342,4 +438,16 @@ const MARKETPLACE_LABELS: Record<string, string> = {
 
 export function marketplaceLabel(mp: string): string {
   return MARKETPLACE_LABELS[mp.toLowerCase()] ?? mp
+}
+
+export function styleLabel(id: string | null): string {
+  return STYLE_OPTIONS.find(s => s.id === id)?.label ?? id ?? ''
+}
+
+export function colorHex(id: string | null): string {
+  return COLOR_OPTIONS.find(c => c.id === id)?.hex ?? '#999'
+}
+
+export function colorLabel(id: string | null): string {
+  return COLOR_OPTIONS.find(c => c.id === id)?.label ?? id ?? ''
 }

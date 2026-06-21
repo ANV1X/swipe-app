@@ -3,7 +3,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.auth import get_current_user
+from app.auth import get_current_user, is_admin_user
 from app.models import Collection, CollectionItem, CollectionSubscription, Product, User, Notification
 from app.schemas import CollectionOut, CollectionCreate, ProductOut
 from app.utils import product_to_out
@@ -17,13 +17,13 @@ def _to_out(c: Collection, items_count: int, is_subscribed: bool) -> CollectionO
         author_handle=c.author_handle,
         author_avatar=c.author_avatar, cover_image=c.cover_image,
         subscribers_count=c.subscribers_count, items_count=items_count,
-        is_subscribed=is_subscribed, created_at=c.created_at,
+        is_subscribed=is_subscribed, is_official=c.is_official, created_at=c.created_at,
     )
 
 
 @router.get("/", response_model=list[CollectionOut])
 def list_collections(
-    tab: str = "popular",  # popular | new | subscribed
+    tab: str = "popular",  # popular | new | subscribed | official | community
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -38,6 +38,11 @@ def list_collections(
         if not my_subs:
             return []
         q = q.where(Collection.id.in_(my_subs))
+    elif tab == "official":
+        q = q.where(Collection.is_official.is_(True))
+    elif tab == "community":
+        q = q.where(Collection.is_official.is_(False))
+
     if tab == "new":
         q = q.order_by(Collection.created_at.desc())
     else:
@@ -50,6 +55,20 @@ def list_collections(
             select(func.count()).select_from(CollectionItem).where(CollectionItem.collection_id == c.id)
         ) or 0
         out.append(_to_out(c, items_count, c.id in my_subs))
+    return out
+
+
+@router.get("/mine", response_model=list[CollectionOut])
+def list_my_collections(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    collections = db.scalars(
+        select(Collection).where(Collection.author_id == user.id).order_by(Collection.created_at.desc())
+    ).all()
+    out = []
+    for c in collections:
+        items_count = db.scalar(
+            select(func.count()).select_from(CollectionItem).where(CollectionItem.collection_id == c.id)
+        ) or 0
+        out.append(_to_out(c, items_count, True))
     return out
 
 
@@ -94,6 +113,7 @@ def add_collection_item(
             if subscriber and subscriber.notif_new_in_collection:
                 db.add(Notification(
                     user_id=subscriber.id, type="new_in_collection", product_id=product.id,
+                    collection_id=c.id,
                     title="Новинка в коллекции",
                     body=f"В «{c.name}» добавили: {product.title}",
                 ))
@@ -144,6 +164,7 @@ def create_collection(
         author_handle=body.author_handle or user.username,
         cover_image=body.cover_image,
         subscribers_count=0,
+        is_official=is_admin_user(user),
     )
     db.add(c)
     db.commit()
@@ -170,7 +191,7 @@ def subscribe(collection_id: str, db: Session = Depends(get_db), user: User = De
                 select(func.count()).select_from(CollectionItem).where(CollectionItem.collection_id == c.id)
             ) or 0
             db.add(Notification(
-                user_id=user.id, type="new_in_collection",
+                user_id=user.id, type="new_in_collection", collection_id=c.id,
                 title="Подписка оформлена",
                 body=f"Вы подписались на коллекцию «{c.name}» — {items_now} товаров уже внутри",
             ))

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { SlidersHorizontal, ChevronDown, X, Heart } from 'lucide-react'
-import { fetchProducts, postSwipe, fetchWishlist, formatPrice, Product } from '../api/client'
+import { SlidersHorizontal, ChevronDown, X, Heart, Share2 } from 'lucide-react'
+import {
+  fetchProducts, postSwipe, fetchWishlist, formatPrice,
+  STYLE_OPTIONS, COLOR_OPTIONS, Product,
+} from '../api/client'
+import ShareProductSheet from '../components/ShareProductSheet'
 
 const CATEGORIES = ['Все', 'Одежда', 'Обувь', 'Аксессуары']
 const PRICE_PRESETS = [0, 3000, 8000, 20000]
@@ -16,7 +20,10 @@ export default function FeedPage() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [category, setCategory] = useState('Все')
   const [priceMax, setPriceMax] = useState(0)
+  const [style, setStyle] = useState<string | null>(null)
+  const [color, setColor] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [, setWishlist] = useState<Set<string>>(new Set())
   const [swipeDir, setSwipeDir] = useState<'like' | 'nope' | null>(null)
   const [loading, setLoading] = useState(true)
@@ -25,7 +32,9 @@ export default function FeedPage() {
   const isDragging = useRef(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { loadProducts() }, [category, priceMax])
+  const activeFiltersCount = (priceMax > 0 ? 1 : 0) + (style ? 1 : 0) + (color ? 1 : 0)
+
+  useEffect(() => { loadProducts() }, [category, priceMax, style, color])
   useEffect(() => { loadWishlist() }, [])
 
   async function loadProducts() {
@@ -34,6 +43,9 @@ export default function FeedPage() {
       const data = await fetchProducts({
         category: category !== 'Все' ? category : undefined,
         price_max: priceMax || undefined,
+        style: style || undefined,
+        color: color || undefined,
+        exclude_swiped: true,
       })
       setCards(data)
       setCurrentIndex(0)
@@ -118,6 +130,13 @@ export default function FeedPage() {
     }
   }
 
+  function resetFilters() {
+    setPriceMax(0)
+    setStyle(null)
+    setColor(null)
+    setShowFilters(false)
+  }
+
   if (!loading && !card && cards.length > 0) {
     return (
       <div className="feed-page">
@@ -137,13 +156,17 @@ export default function FeedPage() {
 
   return (
     <div className="feed-page">
+      {showShare && card && (
+        <ShareProductSheet productId={card.id} productTitle={card.title} onClose={() => setShowShare(false)} />
+      )}
+
       <div className="feed-topbar">
         <div className="feed-title">
           Лента <ChevronDown size={18} style={{ color: 'var(--text)' }} />
         </div>
-        <button className="feed-filter-btn" onClick={() => setShowFilters(true)}>
+        <button className="feed-filter-btn" onClick={() => setShowFilters(true)} style={{ position: 'relative' }}>
           <SlidersHorizontal size={18} />
-          {priceMax > 0 && <span className="nav-badge" style={{ position: 'absolute', top: -4, right: -4 }}>•</span>}
+          {activeFiltersCount > 0 && <span className="nav-badge" style={{ position: 'absolute', top: -4, right: -4 }}>{activeFiltersCount}</span>}
         </button>
       </div>
 
@@ -187,6 +210,16 @@ export default function FeedPage() {
                 {card.discount_pct && (
                   <div className="card-discount-badge">-{card.discount_pct}%</div>
                 )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowShare(true) }}
+                  style={{
+                    position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: '50%',
+                    border: 'none', background: 'rgba(0,0,0,0.4)', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 2,
+                  }}
+                >
+                  <Share2 size={15} />
+                </button>
                 {swipeDir === 'like' && <div className="swipe-indicator-like">ЛАЙК</div>}
                 {swipeDir === 'nope' && <div className="swipe-indicator-nope">НЕЕЕ</div>}
                 <div className="card-overlay">
@@ -227,19 +260,75 @@ export default function FeedPage() {
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div className="modal-header">
-              <h3 className="modal-title">Фильтр по цене</h3>
+              <h3 className="modal-title">Фильтры</h3>
               <button className="modal-close" onClick={() => setShowFilters(false)}>✕</button>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '4px 16px 20px' }}>
-              {PRICE_PRESETS.map(p => (
+            <div className="modal-body" style={{ padding: '4px 16px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Цена</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {PRICE_PRESETS.map(p => (
+                    <button
+                      key={p}
+                      className={`filter-chip${priceMax === p ? ' active' : ''}`}
+                      onClick={() => setPriceMax(p)}
+                    >
+                      {p === 0 ? 'Любая цена' : `до ${formatPrice(p)}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Стиль</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  <button
+                    className={`filter-chip${!style ? ' active' : ''}`}
+                    onClick={() => setStyle(null)}
+                  >Любой</button>
+                  {STYLE_OPTIONS.map(s => (
+                    <button
+                      key={s.id}
+                      className={`filter-chip${style === s.id ? ' active' : ''}`}
+                      onClick={() => setStyle(s.id)}
+                    >{s.emoji} {s.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Цвет</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                  {COLOR_OPTIONS.map(c => (
+                    <div
+                      key={c.id}
+                      onClick={() => setColor(color === c.id ? null : c.id)}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                    >
+                      <div style={{
+                        width: 30, height: 30, borderRadius: '50%', background: c.hex,
+                        border: color === c.id ? '3px solid var(--accent)' : c.border ? '1px solid var(--border)' : '2px solid transparent',
+                      }} />
+                      <span style={{ fontSize: 10, color: 'var(--text2)' }}>{c.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
                 <button
-                  key={p}
-                  className={`filter-chip${priceMax === p ? ' active' : ''}`}
-                  onClick={() => { setPriceMax(p); setShowFilters(false) }}
-                >
-                  {p === 0 ? 'Любая цена' : `до ${formatPrice(p)}`}
-                </button>
-              ))}
+                  onClick={resetFilters}
+                  style={{
+                    flex: 1, padding: 12, borderRadius: 12, border: 'none',
+                    background: 'var(--surface2)', color: 'var(--text)', fontWeight: 600, cursor: 'pointer',
+                  }}
+                >Сбросить</button>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="btn-primary"
+                  style={{ flex: 1, margin: 0 }}
+                >Применить</button>
+              </div>
             </div>
           </div>
         </div>

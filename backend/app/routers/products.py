@@ -4,9 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth import get_current_user
-from app.models import Product, User, Wishlist, PriceHistory
+from app.models import Product, User, Wishlist, PriceHistory, Swipe
 from app.schemas import ProductOut
-from app.utils import product_to_out, BUDGET_TO_MAX_PRICE
+from app.utils import product_to_out, BUDGET_TO_MAX_PRICE, build_liked_profile, personalization_score
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -15,20 +15,44 @@ router = APIRouter(prefix="/products", tags=["products"])
 def list_products(
     category: str | None = None,
     gender: str | None = None,
+    style: str | None = None,
+    color: str | None = None,
     price_max: int | None = None,
+    exclude_swiped: bool = False,
+    personalized: bool = True,
     limit: int = Query(default=100, le=300),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    q = select(Product).order_by(Product.created_at.desc())
+    q = select(Product)
     if category and category not in ("Все", "all"):
         q = q.where(Product.category == category)
     if gender:
         q = q.where((Product.gender == gender) | (Product.gender == "unisex"))
+    if style:
+        q = q.where(Product.style == style)
+    if color:
+        q = q.where(Product.color == color)
     if price_max:
         q = q.where(Product.price <= price_max)
-    q = q.limit(limit)
-    products = db.scalars(q).all()
-    return [product_to_out(p) for p in products]
+    if exclude_swiped:
+        swiped_ids = select(Swipe.product_id).where(Swipe.user_id == user.id)
+        q = q.where(Product.id.not_in(swiped_ids))
+
+    # без персонализации сортируем по дате (предсказуемо, например для подбора в админке)
+    if not personalized:
+        products = db.scalars(q.order_by(Product.created_at.desc()).limit(limit)).all()
+        return [product_to_out(p) for p in products]
+
+    # с персонализацией — берём кандидатов с запасом и сортируем по релевантности
+    candidates = db.scalars(q.order_by(Product.created_at.desc()).limit(max(limit * 3, 150))).all()
+    liked = build_liked_profile(db, user.id)
+    scored = sorted(
+        candidates,
+        key=lambda p: (personalization_score(user, p, liked), p.created_at),
+        reverse=True,
+    )
+    return [product_to_out(p) for p in scored[:limit]]
 
 
 @router.get("/deals", response_model=list[ProductOut])
@@ -53,20 +77,21 @@ def for_you(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    q = select(Product).order_by(Product.created_at.desc())
+    q = select(Product)
     if user.pref_gender and user.pref_gender != "all":
         q = q.where((Product.gender == user.pref_gender) | (Product.gender == "unisex"))
     if user.pref_budget:
         max_price = BUDGET_TO_MAX_PRICE.get(user.pref_budget)
         if max_price:
             q = q.where(Product.price <= max_price)
-    products = db.scalars(q.limit(limit)).all()
-    if not products:
-        # без жёсткой фильтрации, если по вкусу пользователя ничего не нашлось
-        products = db.scalars(select(Product).order_by(Product.created_at.desc()).limit(limit)).all()
 
-    match_count = db.scalar(select(func.count()).select_from(Product)) or 0
-    return [product_to_out(p) for p in products]
+    candidates = db.scalars(q.order_by(Product.created_at.desc()).limit(60)).all()
+    if not candidates:
+        candidates = db.scalars(select(Product).order_by(Product.created_at.desc()).limit(60)).all()
+
+    liked = build_liked_profile(db, user.id)
+    scored = sorted(candidates, key=lambda p: personalization_score(user, p, liked), reverse=True)
+    return [product_to_out(p) for p in scored[:limit]]
 
 
 @router.get("/foryou/meta")

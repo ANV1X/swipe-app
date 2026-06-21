@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Flame, Heart, Clock, ExternalLink } from 'lucide-react'
+import { Flame, Heart, Clock, ExternalLink, Share2 } from 'lucide-react'
 import {
   fetchDeals, fetchWishlist, addToWishlist, removeFromWishlist,
   formatPrice, Deal,
 } from '../api/client'
 import { useToast } from '../components/Toast'
+import ShareProductSheet from '../components/ShareProductSheet'
 
 const CATEGORIES = ['Для вас', 'Одежда', 'Обувь', 'Аксессуары']
 
@@ -13,6 +14,7 @@ export default function DealsPage() {
   const [category, setCategory] = useState('Для вас')
   const [saved, setSaved] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [shareDeal, setShareDeal] = useState<Deal | null>(null)
   const { show, node } = useToast()
 
   useEffect(() => { loadDeals() }, [category])
@@ -65,6 +67,9 @@ export default function DealsPage() {
   return (
     <div className="page-bg">
       {node}
+      {shareDeal && (
+        <ShareProductSheet productId={shareDeal.id} productTitle={shareDeal.title} onClose={() => setShareDeal(null)} />
+      )}
       <div className="page-header">
         <div className="page-title">
           Горячие скидки <Flame size={22} style={{ display: 'inline', verticalAlign: 'middle', color: 'var(--orange)' }} />
@@ -102,6 +107,16 @@ export default function DealsPage() {
                   onClick={() => toggleSave(p)}
                 >
                   <Heart size={16} fill={saved.has(p.id) ? 'currentColor' : 'none'} />
+                </button>
+                <button
+                  onClick={() => setShareDeal(p)}
+                  style={{
+                    position: 'absolute', top: 10, left: 10, width: 30, height: 30, borderRadius: '50%',
+                    border: 'none', background: 'rgba(0,0,0,0.4)', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  }}
+                >
+                  <Share2 size={14} />
                 </button>
                 <div className="deal-timer-badge">
                   <Clock size={11} /> Горячая скидка

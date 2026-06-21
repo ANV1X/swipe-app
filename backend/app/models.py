@@ -68,6 +68,8 @@ class Product(Base):
     external_url = Column(String, nullable=False)
     category = Column(String, nullable=False, default="Одежда")     # Одежда | Обувь | Аксессуары
     gender = Column(String, nullable=True)            # male | female | unisex
+    style = Column(String, nullable=True)              # minimal | casual | street | smart | sport | romantic | dark | boho
+    color = Column(String, nullable=True)               # black | white | beige | khaki | navy | gray | brown | green | pink | red
     discount_pct = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -119,6 +121,7 @@ class Collection(Base):
     author_avatar = Column(String, nullable=True)
     cover_image = Column(String, nullable=True)
     subscribers_count = Column(Integer, default=0)
+    is_official = Column(Boolean, default=False)  # коллекция от админа/built-in, а не от обычного пользователя
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -149,25 +152,29 @@ class Notification(Base):
 
     id = Column(String, primary_key=True, default=gen_id)
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
-    type = Column(String, nullable=False)  # price_drop | back_in_stock | new_in_collection
+    type = Column(String, nullable=False)  # price_drop | back_in_stock | new_in_collection | friend_activity | shared_product | shared_collection | battle_matched
     title = Column(String, nullable=False)
     body = Column(String, nullable=False)
     product_id = Column(String, ForeignKey("products.id"), nullable=True)
+    collection_id = Column(String, ForeignKey("collections.id"), nullable=True)
+    from_user_id = Column(String, ForeignKey("users.id"), nullable=True)
     read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Батлы
+# Батлы — соревнуются коллекции (образы), которые сами добавили пользователи
 # ─────────────────────────────────────────────────────────────────────────
 class Battle(Base):
     __tablename__ = "battles"
 
     id = Column(String, primary_key=True, default=gen_id)
-    product_a_id = Column(String, ForeignKey("products.id"), nullable=False)
-    product_b_id = Column(String, ForeignKey("products.id"), nullable=False)
+    collection_a_id = Column(String, ForeignKey("collections.id"), nullable=False)
+    collection_b_id = Column(String, ForeignKey("collections.id"), nullable=False)
     votes_a = Column(Integer, default=0)
     votes_b = Column(Integer, default=0)
+    prize_emoji = Column(String, default="🏆")
+    prize_title = Column(String, nullable=True)  # например "Скидка 1000₽ на Wildberries"
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -183,21 +190,31 @@ class BattleVote(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# Друзья (локальный список контактов пользователя, без обязательной
-# регистрации друга в системе — как в адресной книге)
-# ─────────────────────────────────────────────────────────────────────────
-class Friend(Base):
-    __tablename__ = "friends"
+class BattleSubmission(Base):
+    """Пользователь ставит свою коллекцию в очередь — как только находится
+    соперник (другая коллекция в очереди), система создаёт батл и обе
+    заявки помечаются как matched."""
+    __tablename__ = "battle_submissions"
 
     id = Column(String, primary_key=True, default=gen_id)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
-    friend_name = Column(String, nullable=False)
-    friend_handle = Column(String, nullable=True)
-    friend_avatar_color = Column(String, default="#6C4EF2")
-    friend_initials = Column(String, nullable=True)
-    last_activity = Column(String, nullable=True)
-    activity_time = Column(String, nullable=True)
+    collection_id = Column(String, ForeignKey("collections.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    status = Column(String, default="pending")  # pending | matched
+    battle_id = Column(String, ForeignKey("battles.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Друзья — реальная связь между двумя пользователями приложения,
+# устанавливается по инвайт-ссылке (тем же кодом, что и у рефералов)
+# ─────────────────────────────────────────────────────────────────────────
+class FriendConnection(Base):
+    __tablename__ = "friend_connections"
+    __table_args__ = (UniqueConstraint("user_a_id", "user_b_id", name="uq_friend_pair"),)
+
+    id = Column(String, primary_key=True, default=gen_id)
+    user_a_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    user_b_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

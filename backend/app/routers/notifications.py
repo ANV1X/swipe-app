@@ -10,6 +10,18 @@ from app.schemas import NotificationOut
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
+def _to_out(db: Session, n: Notification) -> NotificationOut:
+    from_user_name = None
+    if n.from_user_id:
+        from_user = db.get(User, n.from_user_id)
+        from_user_name = from_user.first_name if from_user else None
+    return NotificationOut(
+        id=n.id, type=n.type, title=n.title, body=n.body,
+        product_id=n.product_id, collection_id=n.collection_id, from_user_id=n.from_user_id,
+        from_user_name=from_user_name, read=n.read, created_at=n.created_at,
+    )
+
+
 def generate_price_drop_notifications(db: Session, user: User) -> None:
     """
     Реальная (не выдуманная) генерация уведомлений: смотрим товары в вишлисте
@@ -48,7 +60,7 @@ def list_notifications(db: Session = Depends(get_db), user: User = Depends(get_c
     rows = db.scalars(
         select(Notification).where(Notification.user_id == user.id).order_by(Notification.created_at.desc())
     ).all()
-    return rows
+    return [_to_out(db, n) for n in rows]
 
 
 @router.get("/unread-count")
@@ -69,7 +81,7 @@ def mark_read(notification_id: str, db: Session = Depends(get_db), user: User = 
     n.read = True
     db.commit()
     db.refresh(n)
-    return n
+    return _to_out(db, n)
 
 
 @router.patch("/read-all")

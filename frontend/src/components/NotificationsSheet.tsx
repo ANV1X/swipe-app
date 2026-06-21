@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { TrendingDown, Package, Bookmark, X } from 'lucide-react'
+import { TrendingDown, Package, Bookmark, X, Users, Gift, Layers, Swords, Sparkles } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead, NotificationData } from '../api/client'
 
 type Props = { onClose: () => void; onChange?: () => void }
@@ -13,16 +14,33 @@ function timeAgo(dateStr: string) {
   return 'только что'
 }
 
+const ICON_BY_TYPE: Record<string, { Icon: typeof Bookmark; cls: string }> = {
+  price_drop: { Icon: TrendingDown, cls: 'notif-icon--price_drop' },
+  back_in_stock: { Icon: Package, cls: 'notif-icon--back_in_stock' },
+  new_in_collection: { Icon: Sparkles, cls: 'notif-icon--new_in_collection' },
+  friend_activity: { Icon: Users, cls: 'notif-icon--friend_activity' },
+  shared_product: { Icon: Gift, cls: 'notif-icon--shared_product' },
+  shared_collection: { Icon: Layers, cls: 'notif-icon--shared_collection' },
+  battle_matched: { Icon: Swords, cls: 'notif-icon--battle_matched' },
+}
+
 function NotifIcon({ type }: { type: string }) {
-  const cls = `notif-icon notif-icon--${type}`
-  if (type === 'price_drop') return <div className={cls}><TrendingDown size={18} /></div>
-  if (type === 'back_in_stock') return <div className={cls}><Package size={18} /></div>
-  return <div className={cls}><Bookmark size={18} /></div>
+  const { Icon, cls } = ICON_BY_TYPE[type] ?? { Icon: Bookmark, cls: 'notif-icon--default' }
+  return <div className={`notif-icon ${cls}`}><Icon size={18} /></div>
+}
+
+function navigateForNotification(n: NotificationData): string | null {
+  if (n.type === 'shared_collection' || n.type === 'new_in_collection') return '/collections'
+  if (n.type === 'shared_product' || n.type === 'price_drop' || n.type === 'back_in_stock') return '/wishlist'
+  if (n.type === 'battle_matched') return '/battles'
+  if (n.type === 'friend_activity') return '/friends'
+  return null
 }
 
 export default function NotificationsSheet({ onClose, onChange }: Props) {
   const [notifications, setNotifications] = useState<NotificationData[]>([])
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
     fetchNotifications()
@@ -31,15 +49,20 @@ export default function NotificationsSheet({ onClose, onChange }: Props) {
       .finally(() => setLoading(false))
   }, [])
 
-  async function markRead(id: string) {
-    const target = notifications.find(n => n.id === id)
-    if (!target || target.read) return
-    try {
-      await markNotificationRead(id)
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-      onChange?.()
-    } catch (e) {
-      console.error('mark read failed', e)
+  async function handleClick(n: NotificationData) {
+    if (!n.read) {
+      try {
+        await markNotificationRead(n.id)
+        setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))
+        onChange?.()
+      } catch (e) {
+        console.error('mark read failed', e)
+      }
+    }
+    const dest = navigateForNotification(n)
+    if (dest) {
+      onClose()
+      navigate(dest)
     }
   }
 
@@ -93,8 +116,8 @@ export default function NotificationsSheet({ onClose, onChange }: Props) {
                 <div
                   key={n.id}
                   className="notif-item"
-                  onClick={() => markRead(n.id)}
-                  style={{ opacity: n.read ? 0.6 : 1 }}
+                  onClick={() => handleClick(n)}
+                  style={{ opacity: n.read ? 0.6 : 1, cursor: 'pointer' }}
                 >
                   <NotifIcon type={n.type} />
                   <div className="notif-content">

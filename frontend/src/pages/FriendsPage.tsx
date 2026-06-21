@@ -1,37 +1,68 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, Users, Heart, Bookmark, X, Plus, Copy, Check, Share2, Trash2 } from 'lucide-react'
+import { UserPlus, Users, Bookmark, X, Plus, Copy, Check, Share2, Trash2, Heart, Layers } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
-  fetchFriends, addFriend as apiAddFriend, removeFriend as apiRemoveFriend,
-  fetchSharedWishlists, createSharedWishlist, fetchWishlist, fetchMe,
-  FriendData, SharedWishlistData, WishlistItem,
+  fetchFriends, connectFriend, removeFriend as apiRemoveFriend,
+  fetchSharedWishlists, createSharedWishlist, fetchWishlist, fetchMyCollections, fetchMe,
+  shareProductToFriend, shareCollectionToFriend,
+  formatPrice,
+  FriendData, SharedWishlistData, WishlistItem, CollectionData,
 } from '../api/client'
 import { useToast } from '../components/Toast'
 
-const TABS = ['Активность', 'Общие вишлисты']
+const TABS = ['Друзья', 'Общие вишлисты']
 
-function FriendSheet({ friend, onClose, onCreatedWishlist }: {
-  friend: FriendData; onClose: () => void; onCreatedWishlist: (id: string) => void
+function FriendSheet({ friend, onClose, onRemoved }: {
+  friend: FriendData; onClose: () => void; onRemoved: (id: string) => void
 }) {
+  const [mode, setMode] = useState<'menu' | 'product' | 'collection'>('menu')
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
-  const [creating, setCreating] = useState(false)
+  const [myCollections, setMyCollections] = useState<CollectionData[]>([])
+  const [busy, setBusy] = useState(false)
   const { show } = useToast()
 
   useEffect(() => {
-    fetchWishlist().then(items => setWishlistItems(items.slice(0, 4))).catch(console.error)
-  }, [])
+    if (mode === 'product' && wishlistItems.length === 0) {
+      fetchWishlist().then(setWishlistItems).catch(console.error)
+    }
+    if (mode === 'collection' && myCollections.length === 0) {
+      fetchMyCollections().then(setMyCollections).catch(console.error)
+    }
+  }, [mode])
 
-  async function handleCreateSharedWishlist() {
-    setCreating(true)
+  async function sendProduct(productId: string) {
+    setBusy(true)
     try {
-      const sw = await createSharedWishlist(`С ${friend.friend_name}`)
-      show('Совместный вишлист создан!')
-      onCreatedWishlist(sw.id)
+      await shareProductToFriend(friend.id, productId)
+      show(`Поделились с ${friend.first_name}!`)
+      onClose()
     } catch (e) {
-      console.error('create shared wishlist failed', e)
-      show('Не удалось создать вишлист')
+      console.error('share product failed', e)
     } finally {
-      setCreating(false)
+      setBusy(false)
+    }
+  }
+
+  async function sendCollection(collectionId: string) {
+    setBusy(true)
+    try {
+      await shareCollectionToFriend(friend.id, collectionId)
+      show(`Поделились с ${friend.first_name}!`)
+      onClose()
+    } catch (e) {
+      console.error('share collection failed', e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleRemove() {
+    try {
+      await apiRemoveFriend(friend.id)
+      onRemoved(friend.id)
+      show('Удалено из друзей')
+    } catch (e) {
+      console.error('remove friend failed', e)
     }
   }
 
@@ -43,60 +74,121 @@ function FriendSheet({ friend, onClose, onCreatedWishlist }: {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
               width: 40, height: 40, borderRadius: '50%',
-              background: friend.friend_avatar_color, color: '#fff',
+              background: friend.avatar_color, color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 15, fontWeight: 700, flexShrink: 0,
-            }}>{friend.friend_initials}</div>
+            }}>{friend.initials}</div>
             <div>
-              <div className="modal-title">{friend.friend_name}</div>
-              {friend.friend_handle && <div style={{ fontSize: 12, color: 'var(--text2)' }}>@{friend.friend_handle}</div>}
+              <div className="modal-title">{friend.first_name}</div>
+              {friend.username && <div style={{ fontSize: 12, color: 'var(--text2)' }}>@{friend.username}</div>}
             </div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={14} /></button>
         </div>
         <div className="modal-body" style={{ padding: '16px' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
-            Поделиться вещами из своего вишлиста
-          </div>
-          {wishlistItems.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-              {wishlistItems.map(p => (
-                <div key={p.id} style={{
-                  background: 'var(--surface2)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer'
-                }}>
-                  <img src={p.image_url || ''} alt={p.title} style={{
-                    width: '100%', aspectRatio: '3/4', objectFit: 'cover', objectPosition: 'top', display: 'block'
-                  }} />
-                  <div style={{ padding: '6px 8px', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-                    {p.price.toLocaleString('ru-RU')} ₽
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--text2)', marginBottom: 16 }}>
-              Вишлист пуст
+          {mode === 'menu' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button onClick={() => setMode('product')} style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                padding: 14, borderRadius: 14, border: 'none', background: 'var(--surface2)',
+                fontSize: 14, fontWeight: 600, color: 'var(--text)', cursor: 'pointer',
+              }}>
+                <Heart size={18} color="var(--accent)" /> Поделиться товаром из вишлиста
+              </button>
+              <button onClick={() => setMode('collection')} style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                padding: 14, borderRadius: 14, border: 'none', background: 'var(--surface2)',
+                fontSize: 14, fontWeight: 600, color: 'var(--text)', cursor: 'pointer',
+              }}>
+                <Layers size={18} color="var(--accent)" /> Поделиться своей коллекцией
+              </button>
+              <button onClick={handleRemove} style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                padding: 14, borderRadius: 14, border: 'none', background: 'var(--red-light)',
+                fontSize: 14, fontWeight: 600, color: 'var(--red)', cursor: 'pointer', marginTop: 8,
+              }}>
+                <Trash2 size={18} /> Удалить из друзей
+              </button>
             </div>
           )}
 
-          <button onClick={handleCreateSharedWishlist} disabled={creating} style={{
-            width: '100%', background: 'var(--accent)', color: '#fff', border: 'none',
-            borderRadius: 14, padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            opacity: creating ? 0.7 : 1,
-          }}>
-            <Users size={18} />
-            {creating ? 'Создаём...' : 'Создать совместный вишлист'}
-          </button>
+          {mode === 'product' && (
+            wishlistItems.length === 0 ? (
+              <div style={{ padding: 20, textAlign: 'center', color: 'var(--text2)' }}>Вишлист пуст</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, opacity: busy ? 0.5 : 1 }}>
+                {wishlistItems.map(p => (
+                  <div key={p.id} onClick={() => !busy && sendProduct(p.product_id)} style={{
+                    background: 'var(--surface2)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer'
+                  }}>
+                    <img src={p.image_url || ''} alt={p.title} style={{
+                      width: '100%', aspectRatio: '3/4', objectFit: 'cover', objectPosition: 'top', display: 'block'
+                    }} />
+                    <div style={{ padding: '6px 8px', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                      {formatPrice(p.price)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+
+          {mode === 'collection' && (
+            myCollections.length === 0 ? (
+              <div style={{ padding: 20, textAlign: 'center', color: 'var(--text2)' }}>
+                У вас пока нет своих коллекций — создайте на вкладке «Коллекции»
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, opacity: busy ? 0.5 : 1 }}>
+                {myCollections.map(c => (
+                  <div key={c.id} onClick={() => !busy && sendCollection(c.id)} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12,
+                    background: 'var(--surface2)', cursor: 'pointer',
+                  }}>
+                    {c.cover_image && <img src={c.cover_image} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }} />}
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{c.name}</div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function AddFriendModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: string, handle?: string) => void }) {
-  const [name, setName] = useState('')
-  const [handle, setHandle] = useState('')
+function ConnectByCodeModal({ myLink, onClose, onConnected }: {
+  myLink: string; onClose: () => void; onConnected: (f: FriendData) => void
+}) {
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const { show } = useToast()
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(myLink)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard unavailable */ }
+  }
+
+  async function connect() {
+    if (!code.trim()) return
+    setBusy(true)
+    try {
+      const friend = await connectFriend(code.trim())
+      onConnected(friend)
+      show(`Теперь вы друзья с ${friend.first_name}!`)
+      onClose()
+    } catch (e) {
+      console.error('connect by code failed', e)
+      show('Код не найден — проверьте и попробуйте снова')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -112,43 +204,48 @@ function AddFriendModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name:
             cursor: 'pointer', color: 'var(--text2)'
           }}><X size={14} /></button>
         </div>
-        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <input
-            type="text"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="Имя друга"
-            style={{
-              width: '100%', padding: 14, borderRadius: 12,
-              border: '1.5px solid var(--border)', background: 'var(--surface2)',
-              fontSize: 15, color: 'var(--text)'
-            }}
-          />
-          <input
-            type="text"
-            value={handle}
-            onChange={e => setHandle(e.target.value)}
-            placeholder="@username (необязательно)"
-            style={{
-              width: '100%', padding: 14, borderRadius: 12,
-              border: '1.5px solid var(--border)', background: 'var(--surface2)',
-              fontSize: 15, color: 'var(--text)'
-            }}
-          />
-          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-            <button onClick={onClose} style={{
-              flex: 1, padding: 14, borderRadius: 12, border: 'none',
-              background: 'var(--surface2)', color: 'var(--text)',
-              fontSize: 15, fontWeight: 600, cursor: 'pointer'
-            }}>Отмена</button>
-            <button
-              onClick={() => name.trim() && onAdd(name.trim(), handle.trim() || undefined)}
-              disabled={!name.trim()}
+        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Ваша ссылка</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{
+                flex: 1, padding: '10px 12px', borderRadius: 10, background: 'var(--surface2)',
+                fontSize: 12, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{myLink}</div>
+              <button onClick={copyLink} style={{
+                background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10,
+                padding: '0 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600,
+              }}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6 }}>
+              Отправьте её другу — как только он перейдёт по ссылке, вы автоматически станете друзьями
+            </div>
+          </div>
+
+          <div style={{ height: 1, background: 'var(--border)' }} />
+
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Или введите код друга</div>
+            <input
+              type="text"
+              value={code}
+              onChange={e => setCode(e.target.value)}
+              placeholder="Например: aB3xY9zK"
+              onKeyDown={e => e.key === 'Enter' && connect()}
               style={{
-                flex: 1, padding: 14, borderRadius: 12, border: 'none',
+                width: '100%', padding: 14, borderRadius: 12,
+                border: '1.5px solid var(--border)', background: 'var(--surface2)',
+                fontSize: 15, color: 'var(--text)'
+              }}
+            />
+            <button
+              onClick={connect}
+              disabled={!code.trim() || busy}
+              style={{
+                width: '100%', marginTop: 10, padding: 14, borderRadius: 12, border: 'none',
                 background: 'var(--accent)', color: '#fff',
-                fontSize: 15, fontWeight: 600, cursor: 'pointer', opacity: name.trim() ? 1 : 0.5
-              }}>Добавить</button>
+                fontSize: 15, fontWeight: 600, cursor: 'pointer', opacity: code.trim() ? 1 : 0.5
+              }}>{busy ? 'Подключаем...' : 'Подключить'}</button>
           </div>
         </div>
       </div>
@@ -207,22 +304,14 @@ function CreateWishlistModal({ onClose, onCreate }: { onClose: () => void; onCre
   )
 }
 
-function ActivityIcon({ activity }: { activity: string }) {
-  if (activity?.includes('лайкнул') || activity?.includes('сохранил')) return <Heart size={13} fill="var(--red)" stroke="none" />
-  if (activity?.includes('добавил')) return <Bookmark size={13} color="var(--accent)" />
-  if (activity?.includes('создал')) return <Users size={13} color="var(--green)" />
-  return <Heart size={13} color="var(--text3)" />
-}
-
 export default function FriendsPage() {
-  const [tab, setTab] = useState('Активность')
+  const [tab, setTab] = useState('Друзья')
   const [friends, setFriends] = useState<FriendData[]>([])
   const [sharedWishlists, setSharedWishlists] = useState<SharedWishlistData[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedFriend, setSelectedFriend] = useState<FriendData | null>(null)
-  const [showAddFriend, setShowAddFriend] = useState(false)
+  const [showConnect, setShowConnect] = useState(false)
   const [showCreateWishlist, setShowCreateWishlist] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [referralCode, setReferralCode] = useState('')
   const { show, node } = useToast()
   const navigate = useNavigate()
@@ -245,17 +334,6 @@ export default function FriendsPage() {
     }
   }
 
-  async function addFriend(name: string, handle?: string) {
-    try {
-      const friend = await apiAddFriend(name, handle)
-      setFriends(prev => [friend, ...prev])
-      setShowAddFriend(false)
-      show('Друг добавлен!')
-    } catch (e) {
-      console.error('add friend failed', e)
-    }
-  }
-
   async function createWishlist(name: string) {
     try {
       const sw = await createSharedWishlist(name)
@@ -268,14 +346,13 @@ export default function FriendsPage() {
     }
   }
 
-  async function removeFriend(id: string) {
-    try {
-      await apiRemoveFriend(id)
-      setFriends(prev => prev.filter(f => f.id !== id))
-      show('Друг удалён')
-    } catch (e) {
-      console.error('remove friend failed', e)
-    }
+  function handleFriendConnected(f: FriendData) {
+    setFriends(prev => prev.some(x => x.id === f.id) ? prev : [f, ...prev])
+  }
+
+  function handleFriendRemoved(id: string) {
+    setFriends(prev => prev.filter(f => f.id !== id))
+    setSelectedFriend(null)
   }
 
   const referralLink = typeof window !== 'undefined' && referralCode
@@ -286,8 +363,6 @@ export default function FriendsPage() {
     if (!referralLink) return
     try {
       await navigator.clipboard.writeText(referralLink)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
       show('Ссылка скопирована!')
     } catch {
       show('Не удалось скопировать')
@@ -301,27 +376,22 @@ export default function FriendsPage() {
         <FriendSheet
           friend={selectedFriend}
           onClose={() => setSelectedFriend(null)}
-          onCreatedWishlist={id => { setSelectedFriend(null); navigate(`/shared/${id}`) }}
+          onRemoved={handleFriendRemoved}
         />
       )}
-      {showAddFriend && <AddFriendModal onClose={() => setShowAddFriend(false)} onAdd={addFriend} />}
+      {showConnect && (
+        <ConnectByCodeModal
+          myLink={referralLink}
+          onClose={() => setShowConnect(false)}
+          onConnected={handleFriendConnected}
+        />
+      )}
       {showCreateWishlist && <CreateWishlistModal onClose={() => setShowCreateWishlist(false)} onCreate={createWishlist} />}
 
       <div className="page-header">
         <div className="page-title">Друзья</div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            className="header-action-btn"
-            onClick={copyReferralLink}
-            title="Пригласить друзей"
-          >
-            {copied ? <Check size={20} color="var(--green)" /> : <Share2 size={20} />}
-          </button>
-          <button
-            className="header-action-btn"
-            onClick={() => setShowAddFriend(true)}
-            title="Добавить друга"
-          >
+          <button className="header-action-btn" onClick={() => setShowConnect(true)} title="Добавить друга">
             <UserPlus size={22} />
           </button>
         </div>
@@ -339,8 +409,8 @@ export default function FriendsPage() {
       }}>
         <Share2 size={20} color="var(--accent)" />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Пригласите друзей</div>
-          <div style={{ fontSize: 12, color: 'var(--text2)' }}>Получайте бонусы за каждого приглашённого</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Пригласите настоящих друзей</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)' }}>Перейдя по ссылке, человек сразу попадёт к вам в друзья</div>
         </div>
         <button
           onClick={copyReferralLink}
@@ -351,8 +421,7 @@ export default function FriendsPage() {
             display: 'flex', alignItems: 'center', gap: 6
           }}
         >
-          {copied ? <Check size={14} /> : <Copy size={14} />}
-          {copied ? 'Готово' : 'Копировать'}
+          <Copy size={14} /> Копировать
         </button>
       </div>
 
@@ -366,17 +435,19 @@ export default function FriendsPage() {
         ))}
       </div>
 
-      {tab === 'Активность' ? (
+      {tab === 'Друзья' ? (
         <div style={{ padding: '0 16px' }}>
           {loading ? (
             <div className="page-center"><div className="spinner" /></div>
           ) : friends.length === 0 ? (
             <div className="page-center" style={{ minHeight: '30vh' }}>
               <Users size={48} color="var(--text3)" />
-              <div style={{ fontSize: 15, color: 'var(--text2)' }}>Нет друзей</div>
-              <div style={{ fontSize: 13, color: 'var(--text3)' }}>Добавьте друзей и делитесь вишлистами</div>
+              <div style={{ fontSize: 15, color: 'var(--text2)' }}>Пока нет друзей</div>
+              <div style={{ fontSize: 13, color: 'var(--text3)', textAlign: 'center' }}>
+                Отправьте свою ссылку человеку — после перехода вы станете друзьями
+              </div>
               <button
-                onClick={() => setShowAddFriend(true)}
+                onClick={() => setShowConnect(true)}
                 style={{
                   marginTop: 16, background: 'var(--accent)', color: '#fff', border: 'none',
                   borderRadius: 12, padding: '12px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
@@ -393,30 +464,22 @@ export default function FriendsPage() {
                 <div key={f.id} className="friend-item">
                   <div
                     className="friend-avatar-placeholder"
-                    style={{ background: f.friend_avatar_color }}
+                    style={{ background: f.avatar_color }}
                     onClick={() => setSelectedFriend(f)}
                   >
-                    {f.friend_initials}
+                    {f.initials}
                   </div>
                   <div className="friend-info" onClick={() => setSelectedFriend(f)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span className="friend-name">{f.friend_name}</span>
-                      {f.friend_handle && <span style={{ fontSize: 12, color: 'var(--text2)' }}>@{f.friend_handle}</span>}
+                      <span className="friend-name">{f.first_name}</span>
+                      {f.username && <span style={{ fontSize: 12, color: 'var(--text2)' }}>@{f.username}</span>}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                      <ActivityIcon activity={f.last_activity || ''} />
-                      <span className="friend-activity">{f.last_activity || 'Недавно'}</span>
-                    </div>
+                    {f.last_activity && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                        <span className="friend-activity">{f.last_activity}</span>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); removeFriend(f.id) }}
-                    style={{
-                      padding: 8, background: 'none', border: 'none',
-                      color: 'var(--text3)', cursor: 'pointer'
-                    }}
-                  >
-                    <Trash2 size={16} />
-                  </button>
                 </div>
               ))}
             </div>

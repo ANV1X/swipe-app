@@ -8,7 +8,7 @@ from app.database import get_db
 from app.auth import require_admin
 from app.models import (
     User, Swipe, Battle, BattleVote, Wishlist, SharedWishlist, SharedWishlistMember,
-    Referral, Product,
+    Referral, Product, Collection, FriendConnection,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -50,6 +50,12 @@ def get_stats(db: Session = Depends(get_db), _admin: User = Depends(require_admi
     total_referrals = db.scalar(select(func.count()).select_from(Referral)) or 0
     unique_referrers = db.scalar(select(func.count(distinct(Referral.referrer_id)))) or 0
 
+    total_friend_connections = db.scalar(select(func.count()).select_from(FriendConnection)) or 0
+    total_collections = db.scalar(select(func.count()).select_from(Collection)) or 0
+    official_collections = db.scalar(
+        select(func.count()).select_from(Collection).where(Collection.is_official.is_(True))
+    ) or 0
+
     return {
         "users": {
             "total_users": total_users, "new_users_24h": new_24h, "new_users_7d": new_7d,
@@ -73,6 +79,11 @@ def get_stats(db: Session = Depends(get_db), _admin: User = Depends(require_admi
         },
         "referrals": {
             "total_referrals": total_referrals, "unique_referrers": unique_referrers,
+        },
+        "social": {
+            "total_friend_connections": total_friend_connections,
+            "total_collections": total_collections,
+            "official_collections": official_collections,
         },
     }
 
@@ -116,14 +127,13 @@ def export_battles(db: Session = Depends(get_db), _admin: User = Depends(require
     battles = db.scalars(select(Battle).order_by(Battle.created_at.desc())).all()
     out = []
     for b in battles:
-        pa = db.get(Product, b.product_a_id)
-        pb = db.get(Product, b.product_b_id)
+        ca = db.get(Collection, b.collection_a_id)
+        cb = db.get(Collection, b.collection_b_id)
         out.append({
             "id": b.id,
-            "product_a_title": pa.title if pa else "", "product_a_brand": pa.brand if pa else "",
-            "product_a_price": pa.price if pa else 0,
-            "product_b_title": pb.title if pb else "", "product_b_brand": pb.brand if pb else "",
-            "product_b_price": pb.price if pb else 0,
+            "collection_a_name": ca.name if ca else "", "collection_a_author": ca.author_name if ca else "",
+            "collection_b_name": cb.name if cb else "", "collection_b_author": cb.author_name if cb else "",
+            "prize_title": b.prize_title or "",
             "votes_a": b.votes_a, "votes_b": b.votes_b, "total_votes": b.votes_a + b.votes_b,
             "active": b.active, "created_at": b.created_at.isoformat(),
         })
