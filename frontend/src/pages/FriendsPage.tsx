@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   fetchFriends, connectFriend, removeFriend as apiRemoveFriend,
   fetchSharedWishlists, createSharedWishlist, fetchWishlist, fetchMyCollections, fetchMe,
-  shareProductToFriend, shareCollectionToFriend,
+  shareProductToFriend, shareCollectionToFriend, getInviteLink,
   formatPrice,
   FriendData, SharedWishlistData, WishlistItem, CollectionData,
 } from '../api/client'
@@ -355,9 +355,7 @@ export default function FriendsPage() {
     setSelectedFriend(null)
   }
 
-  const referralLink = typeof window !== 'undefined' && referralCode
-    ? `${window.location.origin}?ref=${referralCode}`
-    : ''
+  const referralLink = referralCode ? getInviteLink(referralCode) : ''
 
   async function copyReferralLink() {
     if (!referralLink) return

@@ -5,6 +5,23 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'https://honest-reflection-production-3f73.up.railway.app'
 
+// Username вашего Telegram-бота (без @) и, если настроен, short name Mini App
+// через @BotFather (/newapp или /myapps). Если short name задан — ссылки-приглашения
+// открывают приложение напрямую с переданным кодом (startapp). Если только
+// username — ссылка ведёт в чат с ботом (start), а код нужно будет ввести вручную.
+const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME || 'swipeshops_bot'
+const BOT_APP_SHORT_NAME = import.meta.env.VITE_BOT_APP_SHORT_NAME || ''
+
+export function getInviteLink(code: string): string {
+  if (BOT_USERNAME && BOT_APP_SHORT_NAME) {
+    return `https://t.me/${BOT_USERNAME}/${BOT_APP_SHORT_NAME}?startapp=${code}`
+  }
+  if (BOT_USERNAME) {
+    return `https://t.me/${BOT_USERNAME}?start=${code}`
+  }
+  return `${window.location.origin}?ref=${code}`
+}
+
 let _initData = ''
 export function setInitData(d: string) { _initData = d }
 
