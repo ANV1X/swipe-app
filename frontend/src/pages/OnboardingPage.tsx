@@ -279,7 +279,7 @@ function GenderStep({ selected, onSelect }: { selected: string | null; onSelect:
   ]
   return (
     <div style={{ padding: '8px 24px 0' }}>
-      <StepHeader title="Для кого смотрим?" sub="Это поможет нам показывать подходящие вещи" />
+      <StepHeader emoji="👆" title="Для кого смотрим?" sub="Это поможет нам показывать подходящие вещи" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {opts.map(o => (
           <button
@@ -320,7 +320,7 @@ function GenderStep({ selected, onSelect }: { selected: string | null; onSelect:
 function StylesStep({ selected, onToggle }: { selected: Set<string>; onToggle: (id: string) => void }) {
   return (
     <div style={{ padding: '8px 24px 0' }}>
-      <StepHeader title="Выбери свой стиль" sub="Можно выбрать несколько" />
+      <StepHeader emoji="🎨" title="Выбери свой стиль" sub="Можно выбрать несколько — выберем лучшее сочетание" />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {STYLES.map(s => {
           const active = selected.has(s.id)
@@ -362,7 +362,7 @@ function StylesStep({ selected, onToggle }: { selected: Set<string>; onToggle: (
 function ColorsStep({ selected, onToggle }: { selected: Set<string>; onToggle: (id: string) => void }) {
   return (
     <div style={{ padding: '8px 24px 0' }}>
-      <StepHeader title="Любимые цвета" sub="Что чаще носишь в гардеробе?" />
+      <StepHeader emoji="🎨" title="Любимые цвета" sub="Что чаще носишь в гардеробе?" />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'center' }}>
         {COLORS.map(c => {
           const active = selected.has(c.id)
@@ -401,7 +401,7 @@ function ColorsStep({ selected, onToggle }: { selected: Set<string>; onToggle: (
 function BrandsStep({ selected, onToggle }: { selected: Set<string>; onToggle: (id: string) => void }) {
   return (
     <div style={{ padding: '8px 24px 0' }}>
-      <StepHeader title="Любимые бренды" sub="Выбери хотя бы один" />
+      <StepHeader emoji="🏷️" title="Любимые бренды" sub="Выбери хотя бы один — покажем похожее" />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {BRANDS.map(b => {
           const active = selected.has(b.id)
@@ -434,7 +434,7 @@ function BrandsStep({ selected, onToggle }: { selected: Set<string>; onToggle: (
 function BudgetStep({ selected, onSelect }: { selected: string | null; onSelect: (id: string) => void }) {
   return (
     <div style={{ padding: '8px 24px 0' }}>
-      <StepHeader title="Твой бюджет на вещь" sub="Будем показывать подходящие цены" />
+      <StepHeader emoji="💳" title="Твой бюджет на вещь" sub="Будем показывать товары в нужном ценовом диапазоне" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {BUDGETS.map(b => {
           const active = selected === b.id
@@ -536,13 +536,14 @@ function DoneStep({ styles, colors }: { styles: Set<string>; colors: Set<string>
   )
 }
 
-function StepHeader({ title, sub }: { title: string; sub: string }) {
+function StepHeader({ title, sub, emoji }: { title: string; sub: string; emoji?: string }) {
   return (
     <div style={{ marginBottom: 24 }}>
-      <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', letterSpacing: -0.3, marginBottom: 6 }}>
+      {emoji && <div style={{ fontSize: 32, marginBottom: 10 }}>{emoji}</div>}
+      <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', letterSpacing: -0.4, lineHeight: 1.2, marginBottom: 8 }}>
         {title}
       </div>
-      <div style={{ fontSize: 14, color: 'var(--text2)' }}>{sub}</div>
+      <div style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.5 }}>{sub}</div>
     </div>
   )
 }

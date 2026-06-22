@@ -44,7 +44,8 @@ export function SharedWishlistList() {
   return (
     <div className="shared-page">
       <div className="shared-header">
-        <h1 className="page-title">Совместные</h1>
+        <button className="btn-back" onClick={() => navigate(-1)} style={{ marginRight: 8 }}>←</button>
+        <h1 className="page-title" style={{ flex: 1 }}>Совместные</h1>
         <button className="btn-icon" onClick={() => setShowForm(v => !v)}>
           {showForm ? '✕' : '＋'}
         </button>
@@ -232,7 +233,7 @@ export function SharedWishlistDetail() {
     <div className="shared-detail-page">
       {/* Шапка */}
       <div className="shared-detail-header">
-        <button className="btn-back" onClick={() => navigate('/shared')}>←</button>
+        <button className="btn-back" onClick={() => navigate(-1)}>←</button>
         <div style={{ flex: 1 }}>
           <h2 className="shared-detail-title">{sw.name}</h2>
           <p className="shared-detail-meta">

@@ -10,7 +10,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'https://honest-reflection-prod
 // открывают приложение напрямую с переданным кодом (startapp). Если только
 // username — ссылка ведёт в чат с ботом (start), а код нужно будет ввести вручную.
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME || 'swipeshops_bot'
-const BOT_APP_SHORT_NAME = import.meta.env.VITE_BOT_APP_SHORT_NAME || ''
+const BOT_APP_SHORT_NAME = import.meta.env.VITE_BOT_APP_SHORT_NAME || 'SwipeShops'
 
 export function getInviteLink(code: string): string {
   if (BOT_USERNAME && BOT_APP_SHORT_NAME) {
@@ -109,10 +109,15 @@ export interface BattleCollectionSide {
 
 export interface BattleData {
   id: string; active: boolean; votes_a: number; votes_b: number
-  prize_emoji: string; prize_title: string | null
+  prize_emoji: string; prize_title: string | null; prize_type: 'none' | 'stars' | 'premium' | 'item' | 'promocode'
   created_at: string
   collection_a: BattleCollectionSide; collection_b: BattleCollectionSide
   my_vote: 'a' | 'b' | null
+  winner: 'a' | 'b' | 'tie' | null
+}
+
+export interface PrizePreset {
+  type: string; emoji: string; label: string; default_title: string
 }
 
 export interface BattleSubmissionResult {
@@ -128,9 +133,15 @@ export interface FriendData {
 
 export interface NotificationData {
   id: string; type: string; title: string; body: string
-  product_id: string | null; collection_id: string | null
+  product_id: string | null; collection_id: string | null; battle_id: string | null
   from_user_id: string | null; from_user_name: string | null
   read: boolean; created_at: string
+}
+
+export interface ThreadItem {
+  id: string; type: string; from_user_id: string | null; is_mine: boolean
+  body: string; product: Product | null; collection: CollectionData | null
+  battle_id: string | null; read: boolean; created_at: string
 }
 
 export interface SharedMember { user_id: string; first_name: string; joined_at: string }
@@ -270,12 +281,20 @@ export async function voteBattle(id: string, choice: 'a' | 'b'): Promise<BattleD
 }
 
 export async function createBattle(
-  collection_a_id: string, collection_b_id: string, prize_title?: string, prize_emoji = '🏆'
+  collection_a_id: string, collection_b_id: string, prize_title?: string, prize_emoji = '🏆', prize_type = 'none'
 ): Promise<BattleData> {
   return request('/battles/', {
     method: 'POST',
-    body: JSON.stringify({ collection_a_id, collection_b_id, prize_title, prize_emoji }),
+    body: JSON.stringify({ collection_a_id, collection_b_id, prize_title, prize_emoji, prize_type }),
   })
+}
+
+export async function fetchBattleHistory(limit = 20): Promise<BattleData[]> {
+  return request(`/battles/history?limit=${limit}`)
+}
+
+export async function fetchPrizePresets(): Promise<PrizePreset[]> {
+  return request('/battles/prizes')
 }
 
 export async function submitToBattle(collectionId: string): Promise<BattleSubmissionResult> {
@@ -309,6 +328,16 @@ export async function shareCollectionToFriend(friendId: string, collectionId: st
   return request('/friends/share/collection', {
     method: 'POST', body: JSON.stringify({ friend_id: friendId, collection_id: collectionId }),
   })
+}
+
+export async function askFriendToVote(friendId: string, battleId: string) {
+  return request('/friends/ask-vote', {
+    method: 'POST', body: JSON.stringify({ friend_id: friendId, battle_id: battleId }),
+  })
+}
+
+export async function fetchFriendThread(friendUserId: string): Promise<ThreadItem[]> {
+  return request(`/friends/${friendUserId}/thread`)
 }
 
 // ─── Notifications ─────────────────────────────────────────────────────

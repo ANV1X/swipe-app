@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Flame, Heart, Clock, ExternalLink, Share2 } from 'lucide-react'
+import { Flame, Heart, Clock, ExternalLink, Share2, ArrowLeft } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import {
   fetchDeals, fetchWishlist, addToWishlist, removeFromWishlist,
   formatPrice, Deal,
@@ -10,6 +11,7 @@ import ShareProductSheet from '../components/ShareProductSheet'
 const CATEGORIES = ['Для вас', 'Одежда', 'Обувь', 'Аксессуары']
 
 export default function DealsPage() {
+  const navigate = useNavigate()
   const [deals, setDeals] = useState<Deal[]>([])
   const [category, setCategory] = useState('Для вас')
   const [saved, setSaved] = useState<Set<string>>(new Set())
@@ -71,9 +73,11 @@ export default function DealsPage() {
         <ShareProductSheet productId={shareDeal.id} productTitle={shareDeal.title} onClose={() => setShareDeal(null)} />
       )}
       <div className="page-header">
-        <div className="page-title">
-          Горячие скидки <Flame size={22} style={{ display: 'inline', verticalAlign: 'middle', color: 'var(--orange)' }} />
+        <button className="back-btn" onClick={() => navigate(-1)}><ArrowLeft size={18} /></button>
+        <div style={{ flex: 1, textAlign: 'center', fontSize: 17, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          Горячие скидки <Flame size={18} style={{ color: 'var(--orange)' }} />
         </div>
+        <div style={{ width: 36 }} />
       </div>
 
       <div className="filter-bar">

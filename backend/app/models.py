@@ -152,11 +152,12 @@ class Notification(Base):
 
     id = Column(String, primary_key=True, default=gen_id)
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
-    type = Column(String, nullable=False)  # price_drop | back_in_stock | new_in_collection | friend_activity | shared_product | shared_collection | battle_matched
+    type = Column(String, nullable=False)  # price_drop | back_in_stock | new_in_collection | friend_activity | shared_product | shared_collection | battle_matched | battle_vote_request
     title = Column(String, nullable=False)
     body = Column(String, nullable=False)
     product_id = Column(String, ForeignKey("products.id"), nullable=True)
     collection_id = Column(String, ForeignKey("collections.id"), nullable=True)
+    battle_id = Column(String, ForeignKey("battles.id"), nullable=True)
     from_user_id = Column(String, ForeignKey("users.id"), nullable=True)
     read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -175,6 +176,7 @@ class Battle(Base):
     votes_b = Column(Integer, default=0)
     prize_emoji = Column(String, default="🏆")
     prize_title = Column(String, nullable=True)  # например "Скидка 1000₽ на Wildberries"
+    prize_type = Column(String, default="none")  # none | stars | premium | item | promocode
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

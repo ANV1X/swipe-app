@@ -1,16 +1,46 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth import get_current_user
-from app.models import FriendConnection, User, Swipe, Notification, Product, Collection
-from app.schemas import FriendOut, FriendConnectIn, ShareProductIn, ShareCollectionIn
-from app.utils import relative_time_ru
+from app.models import (
+    FriendConnection, User, Notification, Product, Collection,
+    CollectionItem, CollectionSubscription, Battle,
+)
+from app.schemas import (
+    FriendOut, FriendConnectIn, ShareProductIn, ShareCollectionIn, AskVoteIn, ThreadItem, CollectionOut,
+)
+from app.utils import relative_time_ru, product_to_out
 
 router = APIRouter(prefix="/friends", tags=["friends"])
 
 AVATAR_COLORS = ['#EF4444', '#F97316', '#FBBF24', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899']
+THREAD_TYPES = ["shared_product", "shared_collection", "battle_vote_request"]
+
+
+def _are_friends(db: Session, user_a: str, user_b: str) -> bool:
+    a, b = sorted([user_a, user_b])
+    return db.scalar(
+        select(FriendConnection).where(FriendConnection.user_a_id == a, FriendConnection.user_b_id == b)
+    ) is not None
+
+
+def _collection_out(db: Session, c: Collection, viewer_id: str) -> CollectionOut:
+    items_count = db.scalar(
+        select(func.count()).select_from(CollectionItem).where(CollectionItem.collection_id == c.id)
+    ) or 0
+    is_subscribed = db.scalar(
+        select(CollectionSubscription).where(
+            CollectionSubscription.collection_id == c.id, CollectionSubscription.user_id == viewer_id
+        )
+    ) is not None
+    return CollectionOut(
+        id=c.id, name=c.name, author_id=c.author_id, author_name=c.author_name,
+        author_handle=c.author_handle, author_avatar=c.author_avatar, cover_image=c.cover_image,
+        subscribers_count=c.subscribers_count, items_count=items_count,
+        is_subscribed=is_subscribed, is_official=c.is_official, created_at=c.created_at,
+    )
 
 
 def _avatar_color(user_id: str) -> str:
@@ -104,11 +134,7 @@ def share_product(
     product = db.get(Product, body.product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    a, b = sorted([user.id, body.friend_id])
-    is_friend = db.scalar(
-        select(FriendConnection).where(FriendConnection.user_a_id == a, FriendConnection.user_b_id == b)
-    )
-    if not is_friend:
+    if not _are_friends(db, user.id, body.friend_id):
         raise HTTPException(status_code=403, detail="Not friends with this user")
     db.add(Notification(
         user_id=body.friend_id, type="shared_product", product_id=product.id, from_user_id=user.id,
@@ -126,11 +152,7 @@ def share_collection(
     collection = db.get(Collection, body.collection_id)
     if not collection:
         raise HTTPException(status_code=404, detail="Collection not found")
-    a, b = sorted([user.id, body.friend_id])
-    is_friend = db.scalar(
-        select(FriendConnection).where(FriendConnection.user_a_id == a, FriendConnection.user_b_id == b)
-    )
-    if not is_friend:
+    if not _are_friends(db, user.id, body.friend_id):
         raise HTTPException(status_code=403, detail="Not friends with this user")
     db.add(Notification(
         user_id=body.friend_id, type="shared_collection", collection_id=collection.id, from_user_id=user.id,
@@ -139,3 +161,51 @@ def share_collection(
     ))
     db.commit()
     return {"ok": True}
+
+
+@router.post("/ask-vote")
+def ask_vote(body: AskVoteIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    battle = db.get(Battle, body.battle_id)
+    if not battle:
+        raise HTTPException(status_code=404, detail="Battle not found")
+    if not _are_friends(db, user.id, body.friend_id):
+        raise HTTPException(status_code=403, detail="Not friends with this user")
+    db.add(Notification(
+        user_id=body.friend_id, type="battle_vote_request", battle_id=battle.id, from_user_id=user.id,
+        title="Просьба проголосовать",
+        body=f"{user.first_name} просит вас проголосовать в его батле!",
+    ))
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/{friend_user_id}/thread", response_model=list[ThreadItem])
+def get_thread(
+    friend_user_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """История того, чем вы с другом делились друг с другом — товары, коллекции,
+    просьбы проголосовать в батле. Сортировка от старых к новым, как в чате."""
+    if not _are_friends(db, user.id, friend_user_id):
+        raise HTTPException(status_code=403, detail="Not friends with this user")
+
+    rows = db.scalars(
+        select(Notification).where(
+            Notification.type.in_(THREAD_TYPES),
+            or_(
+                and_(Notification.user_id == user.id, Notification.from_user_id == friend_user_id),
+                and_(Notification.user_id == friend_user_id, Notification.from_user_id == user.id),
+            ),
+        ).order_by(Notification.created_at)
+    ).all()
+
+    out = []
+    for n in rows:
+        product = product_to_out(db.get(Product, n.product_id)) if n.product_id else None
+        collection_obj = db.get(Collection, n.collection_id) if n.collection_id else None
+        collection = _collection_out(db, collection_obj, user.id) if collection_obj else None
+        out.append(ThreadItem(
+            id=n.id, type=n.type, from_user_id=n.from_user_id, is_mine=(n.from_user_id == user.id),
+            body=n.body, product=product, collection=collection, battle_id=n.battle_id,
+            read=n.read, created_at=n.created_at,
+        ))
+    return out

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
@@ -7,15 +7,12 @@ from app.auth import get_current_user
 from app.models import (
     Battle, BattleVote, BattleSubmission, Collection, CollectionItem, Product, User, Notification
 )
-from app.schemas import BattleOut, BattleVoteIn, BattleCreate, BattleSubmissionIn, BattleSubmissionOut, BattleCollectionSide
+from app.schemas import (
+    BattleOut, BattleVoteIn, BattleCreate, BattleSubmissionIn, BattleSubmissionOut,
+    BattleCollectionSide, PRIZE_PRESETS,
+)
 
 router = APIRouter(prefix="/battles", tags=["battles"])
-
-DEFAULT_PRIZES = [
-    ("🏆", "Слава и место в топе недели"),
-    ("🎁", "Промокод на скидку 500₽"),
-    ("💎", "Бейдж «Икона стиля» в профиле"),
-]
 
 
 def _collection_side(db: Session, collection_id: str) -> BattleCollectionSide | None:
@@ -36,6 +33,14 @@ def _collection_side(db: Session, collection_id: str) -> BattleCollectionSide | 
     )
 
 
+def _winner(b: Battle) -> str | None:
+    if b.active:
+        return None
+    if b.votes_a == b.votes_b:
+        return "tie"
+    return "a" if b.votes_a > b.votes_b else "b"
+
+
 def _to_out(db: Session, b: Battle, my_vote: str | None) -> BattleOut | None:
     side_a = _collection_side(db, b.collection_a_id)
     side_b = _collection_side(db, b.collection_b_id)
@@ -43,8 +48,9 @@ def _to_out(db: Session, b: Battle, my_vote: str | None) -> BattleOut | None:
         return None
     return BattleOut(
         id=b.id, active=b.active, votes_a=b.votes_a, votes_b=b.votes_b,
-        prize_emoji=b.prize_emoji, prize_title=b.prize_title,
-        created_at=b.created_at, collection_a=side_a, collection_b=side_b, my_vote=my_vote,
+        prize_emoji=b.prize_emoji, prize_title=b.prize_title, prize_type=b.prize_type or "none",
+        created_at=b.created_at, collection_a=side_a, collection_b=side_b,
+        my_vote=my_vote, winner=_winner(b),
     )
 
 
@@ -57,6 +63,32 @@ def get_active_battle(db: Session = Depends(get_db), user: User = Depends(get_cu
         select(BattleVote).where(BattleVote.battle_id == battle.id, BattleVote.user_id == user.id)
     )
     return _to_out(db, battle, vote.choice if vote else None)
+
+
+@router.get("/history", response_model=list[BattleOut])
+def get_battle_history(
+    limit: int = Query(default=20, le=100),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Сетка прошедших и текущих батлов — для красивого экрана со всеми сражениями."""
+    battles = db.scalars(select(Battle).order_by(Battle.created_at.desc()).limit(limit)).all()
+    my_votes = {
+        v.battle_id: v.choice for v in db.scalars(
+            select(BattleVote).where(BattleVote.user_id == user.id)
+        ).all()
+    }
+    out = []
+    for b in battles:
+        item = _to_out(db, b, my_votes.get(b.id))
+        if item:
+            out.append(item)
+    return out
+
+
+@router.get("/prizes")
+def get_prize_presets():
+    return PRIZE_PRESETS
 
 
 @router.post("/{battle_id}/vote", response_model=BattleOut)
@@ -92,9 +124,11 @@ def create_battle(body: BattleCreate, db: Session = Depends(get_db)):
     b = db.get(Collection, body.collection_b_id)
     if not a or not b:
         raise HTTPException(status_code=404, detail="Collection not found")
+    # деактивируем предыдущий батл, чтобы на экране всегда был один активный
+    db.execute(Battle.__table__.update().where(Battle.active.is_(True)).values(active=False))
     battle = Battle(
         collection_a_id=body.collection_a_id, collection_b_id=body.collection_b_id,
-        prize_title=body.prize_title, prize_emoji=body.prize_emoji, active=True,
+        prize_title=body.prize_title, prize_emoji=body.prize_emoji, prize_type=body.prize_type, active=True,
     )
     db.add(battle)
     db.commit()
@@ -140,10 +174,11 @@ def submit_collection(
         return BattleSubmissionOut(status="waiting")
 
     import random
-    emoji, title = random.choice(DEFAULT_PRIZES)
+    preset = random.choice([p for p in PRIZE_PRESETS if p["type"] != "none"])
     battle = Battle(
         collection_a_id=opponent.collection_id, collection_b_id=body.collection_id,
-        prize_emoji=emoji, prize_title=title, active=True,
+        prize_emoji=preset["emoji"], prize_title=preset["default_title"], prize_type=preset["type"],
+        active=True,
     )
     # деактивируем предыдущий батл, чтобы на экране всегда был один активный
     db.execute(
@@ -161,13 +196,13 @@ def submit_collection(
     if opponent_user and opponent_user.notif_battles:
         db.add(Notification(
             user_id=opponent_user.id, type="battle_matched",
-            title="Ваш батл начался!", collection_id=opponent.collection_id,
+            title="Ваш батл начался!", collection_id=opponent.collection_id, battle_id=battle.id,
             body=f"Коллекция «{collection.name}» бросает вызов вашей. Голосуем!",
         ))
     if user.notif_battles:
         db.add(Notification(
             user_id=user.id, type="battle_matched",
-            title="Ваш батл начался!", collection_id=body.collection_id,
+            title="Ваш батл начался!", collection_id=body.collection_id, battle_id=battle.id,
             body="Соперник найден — ваша коллекция уже участвует в батле!",
         ))
 

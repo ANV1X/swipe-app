@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, Users, Bookmark, X, Plus, Copy, Check, Share2, Trash2, Heart, Layers } from 'lucide-react'
+import { UserPlus, Users, Bookmark, X, Plus, Copy, Check, Share2, Trash2, Heart, Layers, ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   fetchFriends, connectFriend, removeFriend as apiRemoveFriend,
@@ -158,10 +158,11 @@ function FriendSheet({ friend, onClose, onRemoved }: {
   )
 }
 
-function ConnectByCodeModal({ myLink, onClose, onConnected }: {
-  myLink: string; onClose: () => void; onConnected: (f: FriendData) => void
+function ConnectByCodeModal({ myLink, myCode, onClose, onConnected }: {
+  myLink: string; myCode: string; onClose: () => void; onConnected: (f: FriendData) => void
 }) {
   const [code, setCode] = useState('')
+  const [codeCopied, setCodeCopied] = useState(false)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const { show } = useToast()
@@ -171,6 +172,14 @@ function ConnectByCodeModal({ myLink, onClose, onConnected }: {
       await navigator.clipboard.writeText(myLink)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard unavailable */ }
+  }
+
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(myCode)
+      setCodeCopied(true)
+      setTimeout(() => setCodeCopied(false), 2000)
     } catch { /* clipboard unavailable */ }
   }
 
@@ -217,8 +226,23 @@ function ConnectByCodeModal({ myLink, onClose, onConnected }: {
                 padding: '0 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600,
               }}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6 }}>
-              Отправьте её другу — как только он перейдёт по ссылке, вы автоматически станете друзьями
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6, lineHeight: 1.4 }}>
+              Отправьте её другу — как только он перейдёт по ссылке и откроет приложение, вы автоматически станете друзьями.
+              Если вдруг не сработает — код ниже как запасной вариант.
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Ваш код (продиктуйте или перешлите)</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{
+                flex: 1, padding: '10px 12px', borderRadius: 10, background: 'var(--surface2)',
+                fontSize: 18, fontWeight: 700, letterSpacing: '.05em', color: 'var(--text)', textAlign: 'center',
+              }}>{myCode}</div>
+              <button onClick={copyCode} style={{
+                background: 'var(--accent-light)', color: 'var(--accent)', border: 'none', borderRadius: 10,
+                padding: '0 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600,
+              }}>{codeCopied ? <Check size={14} /> : <Copy size={14} />}</button>
             </div>
           </div>
 
@@ -380,6 +404,7 @@ export default function FriendsPage() {
       {showConnect && (
         <ConnectByCodeModal
           myLink={referralLink}
+          myCode={referralCode}
           onClose={() => setShowConnect(false)}
           onConnected={handleFriendConnected}
         />
@@ -387,12 +412,11 @@ export default function FriendsPage() {
       {showCreateWishlist && <CreateWishlistModal onClose={() => setShowCreateWishlist(false)} onCreate={createWishlist} />}
 
       <div className="page-header">
-        <div className="page-title">Друзья</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="header-action-btn" onClick={() => setShowConnect(true)} title="Добавить друга">
-            <UserPlus size={22} />
-          </button>
-        </div>
+        <button className="back-btn" onClick={() => navigate(-1)}><ArrowLeft size={18} /></button>
+        <div style={{ flex: 1, textAlign: 'center', fontSize: 17, fontWeight: 700 }}>Друзья</div>
+        <button className="header-action-btn" onClick={() => setShowConnect(true)} title="Добавить друга">
+          <UserPlus size={22} />
+        </button>
       </div>
 
       {/* Referral banner */}
@@ -463,11 +487,11 @@ export default function FriendsPage() {
                   <div
                     className="friend-avatar-placeholder"
                     style={{ background: f.avatar_color }}
-                    onClick={() => setSelectedFriend(f)}
+                    onClick={() => navigate(`/friends/${f.id}`)}
                   >
                     {f.initials}
                   </div>
-                  <div className="friend-info" onClick={() => setSelectedFriend(f)}>
+                  <div className="friend-info" onClick={() => navigate(`/friends/${f.id}`)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span className="friend-name">{f.first_name}</span>
                       {f.username && <span style={{ fontSize: 12, color: 'var(--text2)' }}>@{f.username}</span>}

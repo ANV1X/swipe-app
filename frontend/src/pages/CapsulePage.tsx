@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Shirt, Footprints, Layers } from 'lucide-react'
+import { ArrowLeft, Shirt, Footprints, Layers, Plus, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/Toast'
-import { fetchWishlist, WishlistItem } from '../api/client'
+import { fetchWishlist, fetchProducts, addToWishlist, formatPrice, WishlistItem, Product } from '../api/client'
 
 const TARGETS: Record<string, { icon: typeof Shirt; target: number }> = {
   'Одежда': { icon: Shirt, target: 6 },
@@ -12,16 +12,42 @@ const TARGETS: Record<string, { icon: typeof Shirt; target: number }> = {
 
 export default function CapsulePage() {
   const [items, setItems] = useState<WishlistItem[]>([])
+  const [suggestions, setSuggestions] = useState<Record<string, Product[]>>({})
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
   const { show, node } = useToast()
 
   useEffect(() => {
     fetchWishlist()
-      .then(setItems)
+      .then(async wishlist => {
+        setItems(wishlist)
+        const counts: Record<string, number> = {}
+        for (const item of wishlist) counts[item.category] = (counts[item.category] || 0) + 1
+
+        const missing = Object.entries(TARGETS).filter(([key, def]) => (counts[key] || 0) < def.target)
+        const results = await Promise.all(
+          missing.map(([key]) =>
+            fetchProducts({ category: key, exclude_swiped: true, personalized: true }).then(list => [key, list.slice(0, 4)] as const)
+          )
+        )
+        const map: Record<string, Product[]> = {}
+        for (const [key, list] of results) map[key] = list
+        setSuggestions(map)
+      })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
+
+  async function addSuggestion(p: Product) {
+    try {
+      await addToWishlist(p.id)
+      setAddedIds(prev => new Set([...prev, p.id]))
+      show('Добавлено в вишлист')
+    } catch (e) {
+      console.error('add suggestion failed', e)
+    }
+  }
 
   const counts: Record<string, number> = {}
   for (const item of items) counts[item.category] = (counts[item.category] || 0) + 1
@@ -92,22 +118,60 @@ export default function CapsulePage() {
             </div>
           )}
 
-          {/* Add items — переход к ленте, чтобы найти вещи под капсулу */}
+          {/* Add items — реальные подсказки луков под капсулу */}
           <div className="capsule-add-section">
             <div className="capsule-add-title">Чего не хватает:</div>
             {cats.filter(c => c.current < c.target).map(cat => {
               const Icon = cat.icon
+              const items_for_cat = suggestions[cat.key] || []
               return (
-                <div
-                  key={cat.key}
-                  className="capsule-add-item"
-                  onClick={() => { show(`Ищем «${cat.key}» в ленте`); navigate('/') }}
-                >
-                  <div className="capsule-add-icon">
-                    <Icon size={14} />
+                <div key={cat.key} style={{ marginBottom: 14 }}>
+                  <div className="capsule-add-item" style={{ cursor: 'default' }}>
+                    <div className="capsule-add-icon">
+                      <Icon size={14} />
+                    </div>
+                    <span className="capsule-add-label">{cat.key} ({cat.target - cat.current} не хватает)</span>
                   </div>
-                  <span className="capsule-add-label">{cat.key} ({cat.target - cat.current} не хватает)</span>
-                  <button className="capsule-add-plus">+</button>
+                  {items_for_cat.length > 0 ? (
+                    <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '8px 2px 4px', marginLeft: 36 }}>
+                      {items_for_cat.map(p => {
+                        const added = addedIds.has(p.id)
+                        return (
+                          <div key={p.id} style={{
+                            flexShrink: 0, width: 96, borderRadius: 12, overflow: 'hidden',
+                            background: 'var(--surface)', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                          }}>
+                            <div style={{ position: 'relative' }}>
+                              <img src={p.image_url || ''} alt={p.title} style={{
+                                width: '100%', aspectRatio: '3/4', objectFit: 'cover', objectPosition: 'top', display: 'block'
+                              }} />
+                              <button
+                                onClick={() => !added && addSuggestion(p)}
+                                style={{
+                                  position: 'absolute', bottom: 6, right: 6, width: 24, height: 24, borderRadius: '50%',
+                                  border: 'none', background: added ? 'var(--green)' : 'var(--accent)', color: '#fff',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: added ? 'default' : 'pointer',
+                                }}
+                              >
+                                {added ? <Check size={12} /> : <Plus size={12} />}
+                              </button>
+                            </div>
+                            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>
+                              {formatPrice(p.price)}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div
+                      className="capsule-add-item"
+                      style={{ marginLeft: 36, opacity: 0.7 }}
+                      onClick={() => { show(`Ищем «${cat.key}» в ленте`); navigate('/') }}
+                    >
+                      <span className="capsule-add-label">Нет свежих идей — посмотреть в ленте</span>
+                    </div>
+                  )}
                 </div>
               )
             })}

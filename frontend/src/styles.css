@@ -8,14 +8,14 @@
   --accent:       #6C4EF2;
   --accent-dark:  #5B3FD4;
   --accent-light: #EEE9FF;
-  --bg:           #EEEEF4;
+  --bg:           #F4F3FA;
   --surface:      #FFFFFF;
-  --surface2:     #F2F2F8;
-  --surface3:     #E8E8F0;
+  --surface2:     #F0EFF8;
+  --surface3:     #E6E4F4;
   --text:         #0A0A14;
-  --text2:        #7C7C8A;
-  --text3:        #B8B8C4;
-  --border:       #E0E0EC;
+  --text2:        #6C6C82;
+  --text3:        #B0B0C8;
+  --border:       #E2E1F0;
   --red:          #FF3B30;
   --red-light:    #FFF0EE;
   --green:        #34C759;
@@ -24,7 +24,7 @@
   --r-card:       20px;
   --r-btn:        14px;
   --r-chip:       40px;
-  --hero-grad:    linear-gradient(145deg, #EAE5FF 0%, #F5F0FF 30%, #EEEEF4 60%);
+  --hero-grad:    linear-gradient(145deg, #EAE5FF 0%, #F5F0FF 30%, #F4F3FA 60%);
   --header-accent: linear-gradient(135deg, #6C4EF2 0%, #9B7DFF 100%);
 }
 
@@ -69,10 +69,14 @@ html, body, #root {
   margin: 0 auto;
   position: relative;
   background: var(--bg);
+  /* subtle top accent stripe for light theme — invisible in dark mode */
+  background-image:
+    radial-gradient(ellipse 80% 30% at 50% 0%, rgba(108,78,242,0.07) 0%, transparent 70%);
 }
 
 .main-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-bottom: 90px;
@@ -339,15 +343,17 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 12px 24px 16px;
+  padding: 8px 18px 12px;
   min-height: 0;
 }
 
 .swipe-card {
   position: absolute;
-  width: calc(100% - 48px);
+  inset: 0;
+  margin: auto;
+  width: 100%;
   max-width: 320px;
-  height: min(46vh, 420px);
+  height: min(56vh, 480px);
   background: var(--surface);
   border-radius: 24px;
   overflow: hidden;
@@ -379,8 +385,8 @@ html, body, #root {
   content: '';
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  height: 55%;
-  background: linear-gradient(to top, rgba(0,0,0,0.68) 0%, transparent 100%);
+  height: 42%;
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
   pointer-events: none;
 }
 
@@ -394,7 +400,7 @@ html, body, #root {
   padding: 4px 10px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--text);
+  color: #0A0A14;
   z-index: 3;
 }
 
@@ -412,7 +418,7 @@ html, body, #root {
   justify-content: center;
   cursor: pointer;
   z-index: 3;
-  color: var(--text2);
+  color: #1C1C1E;
   transition: all 0.15s;
 }
 .card-bookmark-btn.saved { background: #fff; color: var(--accent); }
@@ -433,32 +439,32 @@ html, body, #root {
 .card-overlay {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  padding: 16px 16px 18px;
+  padding: 14px 14px 14px;
   z-index: 2;
   color: #fff;
 }
 .card-overlay-brand {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .1em;
   opacity: 0.8;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 .card-overlay-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.2;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .card-overlay-price-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.card-overlay-price { font-size: 22px; font-weight: 700; }
+.card-overlay-price { font-size: 19px; font-weight: 700; }
 .card-overlay-price-old {
-  font-size: 13px;
+  font-size: 12px;
   opacity: 0.65;
   text-decoration: line-through;
 }
@@ -466,7 +472,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 .card-overlay-shop {
   display: flex;
@@ -1039,7 +1045,7 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--text2);
+  color: #1C1C1E;
   transition: all 0.15s;
 }
 .deal-fav-btn.saved { color: var(--red); background: #fff; }
@@ -1618,6 +1624,7 @@ html, body, #root {
   max-height: 85vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   animation: slideUp 0.26s ease;
 }
 @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
@@ -1654,6 +1661,7 @@ html, body, #root {
 }
 .modal-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 .modal-body::-webkit-scrollbar { display: none; }
@@ -1869,6 +1877,7 @@ html, body, #root {
 }
 [data-theme="dark"] .modal-sheet { background: var(--surface); }
 [data-theme="dark"] .swipe-card { background: var(--surface); box-shadow: 0 8px 32px rgba(0,0,0,0.35); }
+[data-theme="light"] .swipe-card { box-shadow: 0 4px 24px rgba(108,78,242,0.10), 0 1px 4px rgba(0,0,0,0.06); border: 1px solid rgba(108,78,242,0.08); }
 [data-theme="dark"] .collection-item { background: transparent; }
 [data-theme="dark"] .wishlist-item { box-shadow: none; }
 [data-theme="dark"] .deal-card { box-shadow: none; }

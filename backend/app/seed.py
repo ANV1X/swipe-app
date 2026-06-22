@@ -143,8 +143,23 @@ def seed_database(db: Session) -> None:
     db.add(Battle(
         collection_a_id=a.id, collection_b_id=b.id,
         votes_a=random.randint(5, 40), votes_b=random.randint(5, 40),
-        prize_emoji="🎁", prize_title="Промокод на скидку 1000₽ у партнёра",
+        prize_emoji="🎟️", prize_title="Промокод на скидку 1000₽ у партнёра", prize_type="promocode",
         active=True,
     ))
+
+    # Пара завершённых батлов — чтобы сетка сражений не была пустой
+    from datetime import datetime, timedelta
+    finished_presets = [
+        ("⭐", "50 Telegram Stars", "stars"),
+        ("💎", "1 месяц Telegram Premium", "premium"),
+    ]
+    for i, (emoji, title, ptype) in enumerate(finished_presets):
+        c1, c2 = random.sample(seeded_collections, 2)
+        db.add(Battle(
+            collection_a_id=c1.id, collection_b_id=c2.id,
+            votes_a=random.randint(20, 200), votes_b=random.randint(20, 200),
+            prize_emoji=emoji, prize_title=title, prize_type=ptype,
+            active=False, created_at=datetime.utcnow() - timedelta(days=7 * (i + 1)),
+        ))
 
     db.commit()

@@ -123,10 +123,12 @@ class BattleOut(BaseModel):
     votes_b: int
     prize_emoji: str
     prize_title: str | None
+    prize_type: str
     created_at: datetime
     collection_a: BattleCollectionSide
     collection_b: BattleCollectionSide
     my_vote: str | None = None
+    winner: str | None = None  # "a" | "b" | "tie" — заполняется только для завершённых батлов
 
 
 class BattleVoteIn(BaseModel):
@@ -138,6 +140,7 @@ class BattleCreate(BaseModel):
     collection_b_id: str
     prize_title: str | None = None
     prize_emoji: str = "🏆"
+    prize_type: str = "none"
 
 
 class BattleSubmissionIn(BaseModel):
@@ -147,6 +150,15 @@ class BattleSubmissionIn(BaseModel):
 class BattleSubmissionOut(BaseModel):
     status: str  # "waiting" | "matched"
     battle_id: str | None = None
+
+
+PRIZE_PRESETS = [
+    {"type": "stars", "emoji": "⭐", "label": "Telegram Stars", "default_title": "50 Telegram Stars"},
+    {"type": "premium", "emoji": "💎", "label": "Telegram Premium", "default_title": "1 месяц Telegram Premium"},
+    {"type": "item", "emoji": "👕", "label": "Вещь от бренда", "default_title": "Подарок от партнёра"},
+    {"type": "promocode", "emoji": "🎟️", "label": "Промокод", "default_title": "Промокод на скидку"},
+    {"type": "none", "emoji": "🏆", "label": "Без приза", "default_title": "Слава и место в топе"},
+]
 
 
 # ─── Friends ───────────────────────────────────────────────────────────────
@@ -164,6 +176,24 @@ class FriendConnectIn(BaseModel):
     code: str
 
 
+class AskVoteIn(BaseModel):
+    friend_id: str
+    battle_id: str
+
+
+class ThreadItem(BaseModel):
+    id: str
+    type: str  # shared_product | shared_collection | battle_vote_request | friend_activity
+    from_user_id: str | None
+    is_mine: bool
+    body: str
+    product: ProductOut | None = None
+    collection: CollectionOut | None = None
+    battle_id: str | None = None
+    read: bool
+    created_at: datetime
+
+
 # ─── Notifications ─────────────────────────────────────────────────────────
 class NotificationOut(BaseModel):
     id: str
@@ -172,6 +202,7 @@ class NotificationOut(BaseModel):
     body: str
     product_id: str | None
     collection_id: str | None
+    battle_id: str | None
     from_user_id: str | None
     from_user_name: str | None = None
     read: bool

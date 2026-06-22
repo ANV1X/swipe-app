@@ -17,7 +17,8 @@ def _to_out(db: Session, n: Notification) -> NotificationOut:
         from_user_name = from_user.first_name if from_user else None
     return NotificationOut(
         id=n.id, type=n.type, title=n.title, body=n.body,
-        product_id=n.product_id, collection_id=n.collection_id, from_user_id=n.from_user_id,
+        product_id=n.product_id, collection_id=n.collection_id, battle_id=n.battle_id,
+        from_user_id=n.from_user_id,
         from_user_name=from_user_name, read=n.read, created_at=n.created_at,
     )
 

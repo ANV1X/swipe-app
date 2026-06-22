@@ -78,8 +78,11 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="profile-achievements-section">
-        <div className="profile-achievements-title">Достижения</div>
+      <div className="profile-achievements-section" onClick={() => navigate('/achievements')} style={{ cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="profile-achievements-title">Достижения</div>
+          <ChevronRight size={16} className="profile-menu-arrow" />
+        </div>
         <div className="profile-achievements-row">
           {(profile?.achievements || []).map(a => (
             <div

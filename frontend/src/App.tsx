@@ -13,6 +13,8 @@ import HistoryPage from './pages/HistoryPage'
 import SettingsPage from './pages/SettingsPage'
 import OnboardingPage from './pages/OnboardingPage'
 import AdminPage from './pages/AdminPage'
+import AchievementsPage from './pages/AchievementsPage'
+import FriendThreadPage from './pages/FriendThreadPage'
 import { SharedWishlistList, SharedWishlistDetail, SharedWishlistCreate } from './pages/SharedWishlist'
 import { setInitData, fetchUnreadCount, fetchMe, fetchProfile, registerReferral, connectFriend } from './api/client'
 import { useTelegram } from './hooks/useTelegram'
@@ -115,6 +117,8 @@ function AppShell() {
           <Route path="/history"     element={<HistoryPage />} />
           <Route path="/settings"    element={<SettingsPage />} />
           <Route path="/admin"       element={<AdminPage />} />
+          <Route path="/achievements" element={<AchievementsPage />} />
+          <Route path="/friends/:friendId" element={<FriendThreadPage />} />
           <Route path="/shared"      element={<SharedWishlistList />} />
           <Route path="/shared/new"  element={<SharedWishlistCreate />} />
           <Route path="/shared/:id"  element={<SharedWishlistDetail />} />
